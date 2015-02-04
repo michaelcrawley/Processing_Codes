@@ -1,0 +1,72 @@
+MPGREAD
+
+Purpose
+
+	Translate a movie file in MPEG format into a Matlab movie matrix.
+
+Synopsis
+
+	[movie, map] = mpgread('filename', frames)
+		Matrix movie;
+		Matrix map;
+		String filename;
+		Vector frames;
+
+	[R, G, B] = mpgread('filename', frames);
+		Matrix R;
+		Matrix G;
+		Matrix B;
+		String filename;
+		Vector frames;
+
+Arguments
+
+	movie 		a matrix containing a Matlab movie.
+	map 		(optional) matrix containing a Matlab colormap.
+	'filename' 	string containing the name of the MPEG
+				file to be translated.
+	frames 		(optional) a vector of frame numbers.
+	R		a matrix containing the red image component.
+	G		a matrix containing the green image component.
+	B		a matrix containing the blue image component.
+
+Description
+
+	The mpgread routine translates a movie file from the International
+	Standards Organization MPEG format into the Matlab movie format
+	and places the results into the matrices "movie" and "map".  
+	Alternatively, the output may be requested in RGB format.  The
+	matrix movie contains the Matlab movie and map is filled with a
+	corresponding Matlab colormap.  For example, the first 20 frames of an
+	MPEG movie can be shown with following sequence of commands:
+
+	[movie, map] = mpgread('movie.mpg', [1:20]);
+	figure;
+	colormap(map);
+	movie(movie);
+
+	The frames vector can contain frame numbers in any order and 
+	frames numbers may be repeated.  For example, the following
+	command will create a movie which plays the first 20 frames
+	forward and then in reverse:
+
+	movie = mpgread('movie.mpg', [1:20,20:-1:1]);
+
+	If frame numbers are requested which exceed the total number of
+	frames in the MPEG movie an error message will be printed with the
+	number of MPEG frames in parentheses.  For example:
+
+	??? Frame(s) requested beyond last frame (25).
+
+	indicates that the MPEG movie actually has only 25 frames, but
+	frame numbers greater than 25 had been requested.
+	
+	If the frames vector is ommitted, all frames in the MPEG file
+	will be translated and returned in movie.
+
+See Also
+
+	mpgwrite
+
+
+Copyright (c) 1994 The MathWorks Inc.

@@ -1,0 +1,9 @@
+function [tep,tep1]=t_sub(y,m)
+%tr=T_infinity/T_jet
+tr=0.5;%1.0;
+g=(1.4-1)*m*m/2;
+a=0.25*10;%6.25;
+u=0.5*(1.+tanh(a*(1./y-y)));
+u1=0.5*(1-(tanh(a*(1./y-y)))^2)*a*(-1./y^2-1.);
+tep=tr+(1.-tr+g)*u-g*u^2;
+tep1=(1.-tr+g)*u1-2*g*u*u1;

@@ -1,0 +1,47 @@
+ME 710 Homework 1, Problem 3
+Completed by Michael Crawley on 20-Oct-2010
+
+x/L		Numeric Soln	Analytic Soln
+0.00		 300.00000		 300.00000
+0.05		 315.00000		 315.00000
+0.10		 330.00000		 330.00000
+0.15		 345.00000		 345.00000
+0.20		 360.00000		 360.00000
+0.25		 375.00000		 375.00000
+0.30		 390.00000		 390.00000
+0.35		 405.00000		 405.00000
+0.40		 420.00000		 420.00000
+0.45		 435.00000		 435.00000
+0.50		 450.00000		 450.00000
+0.55		 465.00000		 465.00000
+0.60		 480.00000		 480.00000
+0.65		 495.00000		 495.00000
+0.70		 510.00000		 510.00000
+0.75		 525.00000		 525.00000
+0.80		 540.00000		 540.00000
+0.85		 555.00000		 555.00000
+0.90		 570.00000		 570.00000
+0.95		 585.00000		 585.00000
+1.00		 600.00000		 600.00000
+
+function [Tnumeric x] = H1P3(Tl,Tr, N)
+    x = 0:1/(N-1):1; %create N nodes along the x-direction
+    h = mean(diff(x)); %determine step size along the x-direction
+ 
+    %create coefficients for discretization of general equation
+    coefs = repmat([1 -2 1]/h^2,N-2,1); 
+    %create sparse matrix for solver
+    A = spdiags(coefs,-1:1,N-2,N-2); 
+    B = zeros(1,N-2);
+    B(1) = -Tl/h^2; %set left boundary condition
+    B(end) = -Tr/h^2; %set right boundary condition
+    
+    %solve for temperature at internal nodes
+    Tnumeric = [Tl B/A Tr]; 
+    Tanalytic = Tl + (Tr-Tl)*x;
+    
+    fid=fopen('H1P3.txt','w');
+    fprintf(fid,['ME 710 Homework 1, Problem 3\nCompleted by Michael Crawley on ',date,'\n\nx/L\t\tNumeric Soln\tAnalytic Soln\n']);
+    fprintf(fid,'%1.2f\t\t %3.5f\t\t %3.5f\n',[x; Tnumeric; Tanalytic]);
+    fclose(fid);
+end

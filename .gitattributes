@@ -1,0 +1,7 @@
+* text=auto
+
+#Files to be normalized
+*.m text
+*.mat binary
+*.fig binary
+*.png binary
