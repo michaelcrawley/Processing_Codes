@@ -123,8 +123,11 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
                 v_tmp = reshape(tmp{header_v},np);
                 w_tmp = reshape(tmp{header_w},np);
                 
-                u_theta(:,:,:,n) = cos(grid.theta).*w_tmp + sin(grid.theta).*v_tmp;
-                u_r(:,:,:,n) = -sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
+%                 u_theta(:,:,:,n) = cos(grid.theta).*w_tmp + sin(grid.theta).*v_tmp;
+%                 u_r(:,:,:,n) = -sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
+                u_r(:,:,:,n) = sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
+                u_theta(:,:,:,n) = -w_tmp.*cos(grid.theta) + v_tmp.*sin(grid.theta);
+                
             end
         end
         save([out,filesep,headers{1}{q},'.mat'],'data','t','grid','flags','trigger'); %need to add in actuator signal, once we get it

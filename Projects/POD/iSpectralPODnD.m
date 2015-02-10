@@ -1,4 +1,4 @@
-function [rec] = RecSpectralPODnD(alpha,phi)
+function [rec] = iSpectralPODnD(alpha,phi)
 %This function performs a reconstruction of POD modes and coefficients. The
 %alpha and phi matrices need to be organized per the output of
 %SpectralPODnD. By default, this function will perform the reconstruction
