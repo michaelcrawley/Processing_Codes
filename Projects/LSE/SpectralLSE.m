@@ -28,7 +28,7 @@ function [A,recon] = SpectralLSE(field,signal,alpha)
         V = V/NB;
         svv = svv/NB;
                
-        A(n,:,:) = W\V.';   
+        A(n,:,:) = W\V';   
         
         %Compute coherence and apply to linear weight vectors
         sjj = diag(W);
