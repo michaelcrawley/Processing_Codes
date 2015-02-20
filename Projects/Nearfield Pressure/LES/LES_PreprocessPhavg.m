@@ -26,7 +26,7 @@ function LES_PreprocessPhavg(src,out)
         end
     end
     [grid.theta,grid.r] = cart2pol(grid.y,grid.z); %get polar coordinates as well   
-    grid.theta(1,1,:) = grid.theta(1,2,:); %fix so centerline isn't pure zero
+    grid.theta(1,1,:) = grid.theta(2,2,:); %fix so centerline isn't pure zero
     
     save([out,filesep,'grid.mat'],'grid');
     clear data 
@@ -54,8 +54,8 @@ function LES_PreprocessPhavg(src,out)
         end
         
         %compute cylindrical components
-        data.u_theta = cos(grid.theta).*data.w + sin(grid.theta).*data.v;
-        data.u_r = -sin(grid.theta).*data.w + cos(grid.theta).*data.v;
+%         data.u_theta = cos(grid.theta).*data.w + sin(grid.theta).*data.v;
+%         data.u_r = -sin(grid.theta).*data.w + cos(grid.theta).*data.v;
         
         data.u_r = sin(grid.theta).*data.w + cos(grid.theta).*data.v;
         data.u_theta = -data.w.*cos(grid.theta) + data.v.*sin(grid.theta);
