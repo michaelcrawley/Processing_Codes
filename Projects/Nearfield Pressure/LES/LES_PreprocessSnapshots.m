@@ -21,15 +21,34 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
     data = textscan(fid,repmat('%f ',1,ngheaders));    
     fclose(fid);
     
+%     %parse & reshape
+%     np = cellfun(@(x) length(unique(x)),data(1:ngheaders/2));%first half of headers are indices, second half are physical locations    
+%     np = np(order);
+%     disp('Processing grid file...');
+%     for n = 1:ngheaders  
+%         grid.(headers{1}{n}) = reshape(data{n},np);
+%     end
+%     [grid.theta,grid.r] = cart2pol(grid.y,grid.z); %get polar coordinates as well
+%     clear data;
+    
     %parse & reshape
-    np = cellfun(@(x) length(unique(x)),data(1:ngheaders/2));%first half of headers are indices, second half are physical locations    
+    np = cellfun(@(x) length(unique(x)),data(1:ngheaders/2));%first half of headers are indices, second half are physical locations   
+    tmp = cellfun(@(x) find(diff(x),1),data(1:ngheaders/2),'uniformoutput',false);
+    chk = cellfun(@isempty,tmp);
+    tmp{chk} = 0;
+    [~,order] = sort(cell2mat(tmp));
+%     [~,order] = sort(cellfun(@(x) find(diff(x),1),data(1:ngheaders/2))); 
     np = np(order);
     disp('Processing grid file...');
     for n = 1:ngheaders  
-        grid.(headers{1}{n}) = reshape(data{n},np);
+        grid.(headers{1}{n}) = permute(reshape(data{n},np),order);
+        if n <= ngheaders/2
+            grid.(headers{1}{n}) = uint16(grid.(headers{1}{n})); %lets save some space
+        end
     end
-    [grid.theta,grid.r] = cart2pol(grid.y,grid.z); %get polar coordinates as well
-    clear data;
+    [grid.theta,grid.r] = cart2pol(grid.y,grid.z); %get polar coordinates as well   
+    grid.theta(1,1,:) = grid.theta(2,2,:); %fix so centerline isn't pure zero
+    clear data
     
     %%%%    Actuator File
     %%%%%%%%%%%%%%%%%%%%%
@@ -87,14 +106,14 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
     cpb = ConsoleProgressBar();
     t = zeros(Nf,1);   
     
-    u_theta = zeros([np,Nf]);
-    u_r = zeros([np,Nf]);
+    u_theta = zeros([np(order),Nf]);
+    u_r = zeros([np(order),Nf]);
     
     header_v = strmatch('v',headers{1});
     header_w = strmatch('w',headers{1});
     
     for q = 1:ndheaders
-        data = zeros([np,Nf]);
+        data = zeros([np(order),Nf]);
         cpb.start();
         for n = 1:Nf
             fid = fopen([src filesep flist{n}],'r');
@@ -111,7 +130,7 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
             fclose(fid);
             
             %grab relevant data for this flow variable
-            data(:,:,:,n) = reshape(tmp{q},np);
+            data(:,:,:,n) = permute(reshape(tmp{q},np),order);
             
             %update user
             text = sprintf('Variable %s: %d/%d', headers{1}{q}, n, Nf);
@@ -120,14 +139,13 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
             
             %extra computations for polar vectors
             if q == 1
-                v_tmp = reshape(tmp{header_v},np);
-                w_tmp = reshape(tmp{header_w},np);
+                v_tmp = permute(reshape(tmp{header_v},np),order);
+                w_tmp = permute(reshape(tmp{header_w},np),order);
                 
 %                 u_theta(:,:,:,n) = cos(grid.theta).*w_tmp + sin(grid.theta).*v_tmp;
 %                 u_r(:,:,:,n) = -sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
                 u_r(:,:,:,n) = sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
-                u_theta(:,:,:,n) = -w_tmp.*cos(grid.theta) + v_tmp.*sin(grid.theta);
-                
+                u_theta(:,:,:,n) = -w_tmp.*cos(grid.theta) + v_tmp.*sin(grid.theta);                
             end
         end
         save([out,filesep,headers{1}{q},'.mat'],'data','t','grid','flags','trigger'); %need to add in actuator signal, once we get it
