@@ -1,4 +1,4 @@
-function [recon,A,f] = SpectralLSE(field,signal,fs,alpha)
+function [recon,A,f,c] = SpectralLSE(field,signal,fs,alpha)
 %This function computes a least-squares correlation matrix between a given
 %field and a reference signal, per the theory outlined by Adrian regarding
 %conditional averaging based on linear stochastic estimation. For
@@ -79,6 +79,7 @@ function [recon,A,f] = SpectralLSE(field,signal,fs,alpha)
         A = [A;conj(flipud(A(2:end-1,:,:)))];
         recon = [recon;conj(flipud(recon(2:end-1,:,:)))];
     end
+    c = recon;
     
     recon = ifft(recon,[],1);    
 end
