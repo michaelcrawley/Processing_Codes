@@ -33,9 +33,10 @@ function [recon] = iSpectralLSE(f_c,A,signal,fs)
     tsig = fft(signal,[],1);
     NB = size(signal,3);
 %     recon = complex(zeros(Ns(1),N(2),Ns(3)));
+    A_up = permute(A_up,[2 3 1]); %switch so we don't have to rely on squeeze()
     for n = 1:nfrq
         for q = 1:NB %fix later for multiple blocks
-            recon(n,:,q) = tsig(n,:,q)*squeeze(A_up(n,:,:));
+            recon(n,:,q) = tsig(n,:,q)*A_up(:,:,n);
         end
     end
     

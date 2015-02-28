@@ -33,9 +33,9 @@ function [recon,A,f,c] = SpectralLSE(field,signal,fs,alpha)
     nfrq = ceil((nfft+1)/2);
     f = (0:nfrq-1)*(fs/nfft); %frequency axis
     
-    A = complex(zeros(nfrq,NS,NF));
+    A = complex(zeros(NS,NF,nfrq));
     recon = complex(zeros(nfrq,NF,NB));
-    for n = 1:nfrq %looping through all relevant frequencies
+    for n = 2:nfrq %looping through all relevant frequencies - skip zero frequency
         W = complex(zeros(NS));
         V = complex(zeros(NF,NS));
         if alpha_flag
@@ -55,7 +55,7 @@ function [recon,A,f,c] = SpectralLSE(field,signal,fs,alpha)
             svv = svv/NB;
         end
                
-        A(n,:,:) = W\V';   
+        A(:,:,n) = W\V';   
         
         %Compute coherence and apply to linear weight vectors
         if alpha_flag
@@ -63,13 +63,14 @@ function [recon,A,f,c] = SpectralLSE(field,signal,fs,alpha)
             [Svv,Sjj] = ndgrid(svv,sjj);
             coherence = (abs(V).^2)./Svv./Sjj;
             chk = coherence >= alpha;
-            A(n,:,:) = squeeze(A(n,:,:)).*chk';
+            A(:,:,n) = A(:,:,n).*chk;
         end
     
         for q = 1:NB
-            recon(n,:,q) = tsig(n,:,q)*squeeze(A(n,:,:));
+            recon(n,:,q) = tsig(n,:,q)*A(:,:,n);
         end
     end
+    A = permute(A,[3 1 2]); %switch so that frequency is first dimension
     
     %For the iFFT, both the positive and negative frequencies are necessary
     if mod(nfft,2) %signal length is odd
