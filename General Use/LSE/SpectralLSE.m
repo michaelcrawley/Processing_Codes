@@ -67,11 +67,9 @@ function [recon,A,f] = SpectralLSE(field,FS_f,signal,FS_s,alpha)
         V = V/NB;
         if alpha_flag
             svv = svv/NB;
-        end
-               
-        chk = W == 0;
-        if all(chk(:)), W = Inf; end
+        end              
         A(:,:,iuf(n)) = W\V';   
+        A(isnan(A)|isinf(A)) = 0;%fix for badly conditioned sets
         
         %Compute coherence and apply to linear weight vectors
         if alpha_flag
@@ -85,7 +83,7 @@ function [recon,A,f] = SpectralLSE(field,FS_f,signal,FS_s,alpha)
         for q = 1:NB
             recon(iuf(n),:,q) = tsig(ifs(n),:,q)*A(:,:,iuf(n));
         end
-    end
+    end    
     A = permute(A,[3 1 2]); %switch so that frequency is first dimension - its easier to concatenate this way
     
     %For the iFFT, both the positive and negative frequencies are necessary
