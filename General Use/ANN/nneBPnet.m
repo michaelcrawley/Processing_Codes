@@ -1,4 +1,4 @@
-function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
+function [nneFun, MSE, weights, phi, params] = nneBPnet(xt,d,arch,varargin)
 %This code serves as a engine for a static feed-forward,
 %back-propagation artificial neural network. The network is defined to be
 %fully connected (this cannot be changed by user).
@@ -19,14 +19,14 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
 %               's':        Slope for the default activation function. 
 %                           Default is 1.0.                 
 %               'A':        Amplitude for the default activation function.
-%                           Default is 1.5.
+%                           Default is 1.0.
 %               'maxepoch': Maximum number of epochs for training. Default
 %                           is 1e6.
 %               'lrp':      Learning-rate-parameter. Default is 0.1.
 %               'momentum': Momentum parameter. Default is 0.0.
 %               'wrange':   Range for random assignent for initial weights.
 %                           Default is +/- 2.4/N.
-%               'etotal':   MSE error for convergence. Default is 1e-15.
+%               'etotal':   MSE error for convergence. Default is eps^1/2.
 %               'echange':  Percent change in MSE for convergence. Default
 %                           is 5e-3.
 %               'mode':     Processing mode, either 'batch' or 'pattern'.
@@ -41,6 +41,7 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
 %           MSE:        Mean squared error over epochs.
 %           weights:    Final neural network weights.
 %           phi:        Activation function used by neural network.
+%           params:     Struct containing all network parameters
 
     %Get matrix information
     [N,a1] = size(xt); %get number of training sets
@@ -48,7 +49,7 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
     if N ~= N2
         error('Input Matrix Mismatch');
     end
-    arch = [a1,arch(:),a2]; %append input and output neurons
+    arch = [a1;arch(:);a2]; %append input and output neurons
 
     %Initialize storage containers
     L = length(arch); 
@@ -60,6 +61,7 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
     
     %Get Parameters
     [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = get_options(arch,varargin);
+    params = struct('maxepoch',maxepoch,'eta',eta,'alpha',alpha,'econv_total',econv_total,'econv_change',econv_change','mode',mode,'phi',phi,'dphi',dphi,'weights',weights);
     
     %Set processing parameters
     if strcmpi(mode,'batch')
@@ -73,10 +75,22 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
     else
         error('Processing mode not set');
     end
+    
+    %Set up progress bar
+    cpb = ConsoleProgressBar();
+    cpb.setLeftMargin(4);   % progress bar left margin
+    cpb.setTopMargin(1);    % rows margin
+    cpb.setLength(40);      % progress bar length: [.....]
+    cpb.setMinimum(0);      % minimum value of progress range [min max]
+    cpb.setMaximum(100);    % maximum value of progress range [min max]
+    cpb.setPercentPosition('left');
+    cpb.setTextPosition('right');
+    cpb.setMinimum(0);
+    cpb.setMaximum(maxepoch);
+    cpb.start();
 
     %Perform Back-Propagation Algorithm
     MSE = zeros(maxepoch,1); %Container for Mean-Squared-Error over epochs
-    h = waitbar(0,'Running...');
     for n = 1:maxepoch %epoch counter 
         %Randomize training set order
         if ~flag
@@ -144,17 +158,25 @@ function [nneFun, MSE, weights, phi] = nneBPnet(xt,d,arch,varargin)
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         if (MSE(n) < econv_total) && (abs((MSE(n-1)-MSE(n))/MSE(n-1)) < econv_change)
             MSE = MSE(1:n); %truncate
-            waitbar(1,h,'Converged...');
-            pause(0.5);
+                                
+            text = sprintf('Iteration: %d/%d [Converged]', n, maxepoch);  
+            cpb.setValue(n);  	% update progress value
+            cpb.setText(text);  % update user text
+            sprintf('/n');
             break;
         end
         
         %Update user if not converged
-        if ~rem(n,round(maxepoch/100))
-            waitbar(n/maxepoch,h,['Running... ',num2str(n/maxepoch*100),'% Complete']);
+        if n > 1
+            dmse = MSE(n)-MSE(n-1);
+        else
+            dmse = 0;
         end
+        text = sprintf('Iteration: %d/%d [MSE:%.3g,change:%.3g]', n, maxepoch,MSE(n),dmse);
+        cpb.setValue(n);  	% update progress value
+        cpb.setText(text);  % update user text
     end
-    close(h);
+    sprintf('/n');
 
     %Build Final Function
     str = 'phi([x,-1]*weights{1})';
@@ -179,7 +201,7 @@ function [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = g
         loc = find(cmd == 1) + 1;
         s = commands{loc};
     else
-        s = 1;
+        s = 1.0;
     end
     
     %amplitude for activation function
@@ -187,7 +209,7 @@ function [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = g
         loc = find(cmd == 2)+1;
         A = commands{loc};
     else
-        A = 1.5;
+        A = 1.0;
     end
     
     %maximum number of epochs for training
@@ -227,7 +249,7 @@ function [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = g
         loc = find(cmd == 7)+1;
         econv_total = commands{loc};
     else
-        econv_total = 1e-15;
+        econv_total = sqrt(eps);
     end
     
     %Error limit for convergence based off of MSE rate of change
