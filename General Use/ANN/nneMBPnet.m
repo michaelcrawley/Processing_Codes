@@ -158,7 +158,7 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
             text = sprintf('Iteration: %d/%d [Converged]', n, maxepoch);  
             cpb.setValue(n);  	% update progress value
             cpb.setText(text);  % update user text
-            sprintf('/n');
+            fprintf('\n');
             break;
         end
         
@@ -172,7 +172,7 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
         cpb.setValue(n);  	% update progress value
         cpb.setText(text);  % update user text
     end
-    sprintf('/n');
+    fprintf('\n');
 
     %Build Final Function
     str = 'phi([x,-1]*weights{1})';
