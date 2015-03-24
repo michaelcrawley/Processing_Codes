@@ -1,4 +1,4 @@
-function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
+function [nneFun, MSE, weights, phi,eta,params] = nneMBPnet(xt,d,arch,varargin)
 %This code serves as a engine for a modified feed-forward,
 %back-propagation artificial neural network, which uses the Delta-Bar-Delta 
 %learning rule with gradient descent. Per the results shown in Haykin, only
@@ -56,13 +56,13 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
     Dij_old = Dij;
     dw_old = Dij; %storage for old weight updates (used for momentum in learning)
     Sij = Dij;
-    Sij_old = Dij;
+    eta = Sij;
     y = cell(L,1); %Container for activation levels, training inputs will be in first level
     v = cell(L-1,1); %Container for neuronal summation levels
     delta = cell(L-1,1);   
     
     %Get Parameters
-    [maxepoch,lrp,alpha,econv_total,econv_change,phi,dphi,weights] = get_options(arch,varargin);
+    [maxepoch,lrp,alpha,econv_total,econv_change,phi,dphi,weights,beta,kappa,xi] = get_options(arch,varargin);
     params = struct('maxepoch',maxepoch,'eta',lrp,'alpha',alpha,'econv_total',econv_total,'econv_change',econv_change','phi',phi,'dphi',dphi,'weights',weights);
     
     %Initialize necessary parameters
@@ -71,19 +71,7 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
         Sij{n} = zeros(arch(n)+1,arch(n+1));
         dw_old{n} = zeros(arch(n)+1,arch(n+1));
     end
-    
-    %Set processing parameters
-    if strcmpi(mode,'batch')
-        Npass = 1;
-        N = N;
-        flag = true;
-    elseif strcmpi(mode,'pattern')
-        Npass = N;
-        N = 1;
-        flag = false;
-    else
-        error('Processing mode not set');
-    end
+    Sij_old = Sij;
     
     %Set up progress bar
     cpb = ConsoleProgressBar();
@@ -138,7 +126,10 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
         if n > 2
             for nn = 1:L-1
                 Sij{nn} = (1-xi)*Dij_old{nn} + xi*Sij_old{nn};
-                eta{nn} = eta{nn} + kappa.*(Sij_old{nn}.*Dij{nn} > 0) + -beta*eta{nn}.*(Sij_old{nn}.*Dij{nn} < 0);
+                
+%                 if any(Sij_old{nn}(:).*Dij{nn}(:) < 0), keyboard; end
+                
+                eta{nn} = eta{nn} + lrp*kappa.*(Sij_old{nn}.*Dij{nn} > 0) + -beta*eta{nn}.*(Sij_old{nn}.*Dij{nn} < 0);
             end
         end
 
@@ -147,6 +138,7 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
             weights{nn} = weights{nn}+alpha*dw_old{nn}-eta{nn}.*Dij{nn};
             dw_old{nn} = -eta{nn}.*Dij{nn};
             Dij_old{nn} = Dij{nn};
+            Sij_old{nn} = Sij{nn};
         end 
 
 
@@ -182,9 +174,9 @@ function [nneFun, MSE, weights, phi, params] = nneMBPnet(xt,d,arch,varargin)
     nneFun = eval(['@(x) ' str]);
 end
 
-function [maxepoch,eta,alpha,econv_total,econv_change,phi,dphi,weights] = get_options(arch,commands)
+function [maxepoch,eta,alpha,econv_total,econv_change,phi,dphi,weights,beta,kappa,xi] = get_options(arch,commands)
     %Determine inputs
-    options = {'slope','amplitude','maxepoch','lrp','momentum','wrange','etotal','echange','phi','weights','beta','kappa'};
+    options = {'slope','amplitude','maxepoch','lrp','momentum','wrange','etotal','echange','phi','weights','beta','kappa','xi'};
     cmd = zeros(1,length(commands));
     for n = 1:length(commands)
         if ischar(commands{n})
@@ -294,5 +286,13 @@ function [maxepoch,eta,alpha,econv_total,econv_change,phi,dphi,weights] = get_op
         kappa = commands{loc};
     else
         kappa = 0;
+    end
+    
+    %xi
+    if any(cmd == 13)
+        loc = find(cmd == 13)+1;
+        xi = commands{loc};
+    else
+        xi = 0.5;
     end
 end
