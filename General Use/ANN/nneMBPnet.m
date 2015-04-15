@@ -113,13 +113,13 @@ function [nneFun, MSE, weights, phi,eta,params] = nneMBPnet(xt,d,arch,varargin)
 
         %Compute Output-Layer delta
         delta{end} = e.*dphi(v{end});
-        Dij{end} = -(delta{end}.'*[y{end-1} -ones(N,1)]).'; %include bias weight updating
+        Dij{end} = -(delta{end}.'*[y{end-1} -ones(N,1)]).'/N; %include bias weight updating
 
         %Compute Hidden-Layer delta
         for nn = (L-1):-1:2
             e = delta{nn}*weights{nn}(1:end-1,:).';
             delta{nn-1} = e.*dphi(v{nn-1});
-            Dij{nn-1} = -[y{nn-1} -ones(N,1)].'*delta{nn-1};
+            Dij{nn-1} = -[y{nn-1} -ones(N,1)].'*delta{nn-1}/N;
         end
         
         %Update learning rate
