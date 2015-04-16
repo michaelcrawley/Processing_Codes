@@ -45,7 +45,8 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
     
     %Initialize variables
     arch = [a1;arch(:);a2]; %append input and output neurons
-    [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);    
+    [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
+    weights_old = weights; %initialize here so that momentum can be included immediately
     
     %Set up progress bar
     cpb = ConsoleProgressBar();
@@ -64,46 +65,40 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
     MSE = zeros(maxepoch,1); %Container for Mean-Squared-Error over epochs
     for n = 1:maxepoch %epoch counter 
         
-            %Feed-Forward Computations
-            %%%%%%%%%%%%%%%%%%%%%%%%%%
-            wavelons = wavelet((xt-weights{1})./weights{2}); %single level of hidden wavelons only - shouldn't there be a product here???
-            output = weights{3}*wavelons + weights{4}*xt + weights{5}; %includes linear terms from input and bias terms
+        %Feed-Forward Computations
+        %%%%%%%%%%%%%%%%%%%%%%%%%%
+        z_ij = (xt-weights{2})./weights{1};
+        z_ij_ext = repmat(permute(z_ij,[3 2 1]),N,1);
+        wavelets = wavelet(z_ij_ext);
+        wavelons = prod(wavelets,3); %single level of hidden wavelons only
+        output = weights{3}*wavelons + weights{4}*xt + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
+        
 
-            %Back-Propagation Computations
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %Back-Propagation Computations
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            %Compute Mean-squared error
-            e = d-output; %error signal at output level
-            MSE(n) = mean(sum(e.^2,2))/2; 
+        %Compute Mean-squared error
+        e = d-output; %error signal at output level
+        MSE(n) = mean(sum(e.^2,2))/2; 
 
-            %Compute Output-Layer delta
-            delta{end} = e.*dphi(v{end});
-            if n == 1
-                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/N; %include bias weight updating
-            else
-                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/N+alpha*dw_old{end};
-            end
+        %Compute partial derivatives of error terms
+        de{5} = mean(e,1); %bias terms
+        de{4} = xt'*e/N; %pass-through terms
+        de{3} = wavelons.'*e/N; %wavelon-output terms
+        de{2} = -weights{3}./weights{1} uhhhh; %wavelon scale terms
+        de{1} = (z_ij.*de{2}).'*e/N; %wavelon translation terms            
 
-            %Compute Hidden-Layer delta
-            for nn = (L-1):-1:2
-                e = delta{nn}*weights{nn}(1:end-1,:).';
-                delta{nn-1} = e.*dphi(v{nn-1});
-                if n == 1
-                    dw{nn-1} = eta*[y{nn-1} -ones(Nset,1)].'*delta{nn-1}/Nset;
-                else
-                    dw{nn-1} = eta*[y{nn-1} -ones(Nset,1)].'*delta{nn-1}/Nset+alpha*dw_old{nn-1};
-                end
-            end
-
-            %Update weights
-            for nn = 1:L-1
-                weights{nn} = weights{nn}+dw{nn};
-                dw_old{nn} = dw{nn};
-            end 
+        %Update weights
+        swap = weights;
+        for n = 1:5
+            weights{n} = weights{n} + eta*de{n} + alpha*(weights{n}-weights_old{n});
+        end
+        weights_old = swap;
+            
 
         %%Convergence Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
-        if (MSE(n) < econv_total) && (abs((MSE(n-1)-MSE(n))/MSE(n-1)) < econv_change)
+        if (MSE(n) < econv_total) 
             MSE = MSE(1:n); %truncate
                                 
             text = sprintf('Iteration: %d/%d [Converged]', n, maxepoch);  
@@ -197,8 +192,8 @@ function [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,com
         weights = commands{loc};
     else
         %Weights will organized in five levels:
-        %   Level 1: translation weight for hidden wavelons
-        %   Level 2: scale weight for hidden wavelons
+        %   Level 1: scale weight for hidden wavelons
+        %   Level 2: translation weight for hidden wavelons
         %   Level 3: Linear amplitude weight for hidden-output neurons
         %   Level 4: Linear amplitude weight for input-output
         %   Level 5: Bias weights at output
@@ -210,7 +205,7 @@ function [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,com
     end
 end
 
-function [wavelet] = MotherWavelets(mother,m)
+function [wavelet,dwavelet] = MotherWavelets(mother,m)
 %This function returns a function handle, 'wavelet', given a dimension and
 %string for the name of the mother wavelet. A parameter to modify the base
 %mother wavelet can also be provided. For standard mother wavelets, the
@@ -222,13 +217,11 @@ function [wavelet] = MotherWavelets(mother,m)
     switch lower(mother)
         case 'morlet'
             if isempty(m), m = 6; end
-            wavelet = @(x) (pi^-0.25).*exp(1i*m*x).*exp(-0.5*x^2); 
-        case 'paul'
-            if isempty(m), m = 4; end
-            wavelet = @(k) (2^m/sqrt(m*factorial(2*m-1))).*(k.^m).*exp(-(k).*(k > 0)).*(k > 0);
-        case 'dog'
-            if isempty(m), m = 2; end
-            wavelet = @(k) -(1i^m)/sqrt(gamma(m+0.5))*(k.^m).*exp(-0.5*k.^2);
+            wavelet = @(x) exp(1i*m*x).*exp(-0.5*x^2);
+            dwavelet = @(x) 1i*m*exp(1i*m*x).*exp(-0.5*x^2) - x.*exp(1i*m*x).*exp(-0.5*x^2);
+        case 'mexican'
+            wavelet = @(x) (1-x.^2).*exp(-0.5*x.^2);
+            dwavelet = @(x) 
         otherwise
             error('Undefined Mother Wavelet');
     end

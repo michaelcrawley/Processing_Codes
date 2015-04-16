@@ -28,15 +28,15 @@ function [recon,A,f] = MultiSpectralLSE(field,signal,FS)
         error('Field is not temporally-sparse!');
     end
     
-    unconditional = zeros(NS,NS,BS);
-    conditional = zeros(NS,NF,BS);    
+    unconditional = zeros(NS,NS,BS,NB);
+    conditional = zeros(NS,NF,BS,NB);    
     for n = 1:NB
         for q = 1:NS
             for k = 1:NS
-                unconditional(q,k,:) = permute(unconditional(q,k,:),[3 1 2]) + flipud(signal(:,q,n))*signal(I,k,n)/NB; %remember that the signal gets flipped in the convolution
+                unconditional(q,k,:,n) = flipud(signal(:,q,n))*signal(I,k,n)/NB; %remember that the signal gets flipped in the convolution
             end
             for k = 1:NF
-                conditional(q,k,:) = permute(conditional(q,k,:),[3 1 2]) + flipud(signal(:,q,n))*field(I,k,n)/NB;
+                conditional(q,k,:,n) = flipud(signal(:,q,n))*field(I,k,n)/NB;
             end
         end        
     end
@@ -44,7 +44,9 @@ function [recon,A,f] = MultiSpectralLSE(field,signal,FS)
     %Transform into Fourier domain and compute estimation coefficients at
     %each frequency
     unconditional = fft(unconditional,[],3);
+    unconditional = mean(unconditional,4);
     conditional = fft(conditional,[],3);
+    conditional = mean(conditional,4);
     if mod(BS,2) %signal length is odd
         Nc = (BS-1)/2;
         f = ifftshift(-Nc:Nc)*FS/BS;
