@@ -1,4 +1,4 @@
-function [nneFun, MSE, weights, phi] = nneWaveletNetBP(xt,d,arch,varargin)
+function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
 %This code implements a multidimensional wavelet network per Alexandridis
 %2013 (Neural Networks). Learning is performed using the standard
 %backpropagation algorithm in batch mode. The network is fully connected, 
@@ -45,9 +45,7 @@ function [nneFun, MSE, weights, phi] = nneWaveletNetBP(xt,d,arch,varargin)
     
     %Initialize variables
     arch = [a1;arch(:);a2]; %append input and output neurons
-    [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
-    
-    
+    [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);    
     
     %Set up progress bar
     cpb = ConsoleProgressBar();
@@ -68,34 +66,22 @@ function [nneFun, MSE, weights, phi] = nneWaveletNetBP(xt,d,arch,varargin)
         
             %Feed-Forward Computations
             %%%%%%%%%%%%%%%%%%%%%%%%%%
-            y{1} = xt;
-            input = [y{1} -ones(Nset,1)]; %concat bias term
-            for nn = 1:L-1
-                %compute neuron summation
-                v{nn} = input*weights{nn};
-                %compute activation level
-                y{nn+1} = phi(v{nn});
-                %concat input to account for neuron bias
-                input = [y{nn+1} -ones(Nset,1)];
-            end
+            wavelons = wavelet((xt-weights{1})./weights{2}); %single level of hidden wavelons only - shouldn't there be a product here???
+            output = weights{3}*wavelons + weights{4}*xt + weights{5}; %includes linear terms from input and bias terms
 
             %Back-Propagation Computations
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             %Compute Mean-squared error
-            if flag
-                e = d-y{end}; %error signal at output level
-            else
-                e = d(q,:) - y{end};
-            end
-            MSE(n) = MSE(n) + mean(sum(e.^2,2))/2/Npass; 
+            e = d-output; %error signal at output level
+            MSE(n) = mean(sum(e.^2,2))/2; 
 
             %Compute Output-Layer delta
             delta{end} = e.*dphi(v{end});
             if n == 1
-                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/Nset; %include bias weight updating
+                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/N; %include bias weight updating
             else
-                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/Nset+alpha*dw_old{end};
+                dw{end} = eta*(delta{end}.'*[y{end-1} -ones(Nset,1)]).'/N+alpha*dw_old{end};
             end
 
             %Compute Hidden-Layer delta
@@ -210,14 +196,17 @@ function [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,com
         loc = find(cmd == 7)+1;
         weights = commands{loc};
     else
-        %Weights will organized in three levels:
+        %Weights will organized in five levels:
         %   Level 1: translation weight for hidden wavelons
         %   Level 2: scale weight for hidden wavelons
-        %   Level 3: Linear amplitude weight for output neurons
-        weights = cell(3,1); 
+        %   Level 3: Linear amplitude weight for hidden-output neurons
+        %   Level 4: Linear amplitude weight for input-output
+        %   Level 5: Bias weights at output
         weights{1} = rand(arch(1),arch(2)) - 0.5;
         weights{2} = rand(arch(1),arch(2)) - 0.5;
-        weights{3} = rand(arch(2)+arch(1)+1,arch(end)) - 0.5;        
+        weights{3} = rand(arch(2),arch(end)) - 0.5;
+        weights{4} = rand(arch(1),arch(end)) - 0.5;
+        weights{5} = rand(arch(end),1)-0.5;
     end
 end
 
