@@ -45,7 +45,7 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
     
     %Initialize variables
     arch = [a1;arch(:);a2]; %append input and output neurons
-    [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
+    [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
     weights_old = weights; %initialize here so that momentum can be included immediately
     
     %Set up progress bar
@@ -67,8 +67,9 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
         
         %Feed-Forward Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
+        
         z_ij = (xt-weights{2})./weights{1};
-        z_ij_ext = repmat(permute(z_ij,[3 2 1]),N,1);
+        z_ij_ext = repmat(permute(z_ij,[3 2 1]),N,1); %extend weight to three dimensions
         wavelets = wavelet(z_ij_ext);
         wavelons = prod(wavelets,3); %single level of hidden wavelons only
         output = weights{3}*wavelons + weights{4}*xt + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
@@ -121,15 +122,11 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
     fprintf('\n');
 
     %Build Final Function
-    str = 'phi([x,-1]*weights{1})';
-    for n = 2:L-1
-        str = ['phi([' str ',-1]*weights{',num2str(n),'})'];
-    end
-    nneFun = eval(['@(x) ' str]);
+    nneFun = @(x) prod(wavelet((repmat(x,arch(1),1)-weights{2})./weights{1}),2).'*weights{3} + x*weights{4} + weights{5};
 end
 
 
-function [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,commands)
+function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,commands)
     %Determine inputs
     options = {'mother','maxepoch','lrp','momentum','etotal','weights'};
     cmd = zeros(1,length(commands));
@@ -143,14 +140,15 @@ function [wavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,com
         loc = find(cmd == 1)+1;
         if isa(commands{loc},'function_handle')
             wavelet = commands{loc};
+            dwavelet = commands{loc+1};
         else
             mother = commands{loc};
             m = commands{loc+1};
-            wavelet = MotherWavelets(mother,m);
+            [wavelet,dwavelet] = MotherWavelets(mother,m);
         end 
     else
-        mother = 'morlet';
-        wavelet = MotherWavelets(mother);
+        mother = 'mexican';
+        [wavelet,dwavelet] = MotherWavelets(mother);
     end
     
     
@@ -221,7 +219,7 @@ function [wavelet,dwavelet] = MotherWavelets(mother,m)
             dwavelet = @(x) 1i*m*exp(1i*m*x).*exp(-0.5*x^2) - x.*exp(1i*m*x).*exp(-0.5*x^2);
         case 'mexican'
             wavelet = @(x) (1-x.^2).*exp(-0.5*x.^2);
-            dwavelet = @(x) 
+            dwavelet = @(x) (x.^3 - 3*x).*exp(-0.5*x.^2);
         otherwise
             error('Undefined Mother Wavelet');
     end
