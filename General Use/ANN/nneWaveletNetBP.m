@@ -68,11 +68,14 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
         %Feed-Forward Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         
-        z_ij = (xt-weights{2})./weights{1};
-        z_ij_ext = repmat(permute(z_ij,[3 2 1]),N,1); %extend weight to three dimensions
-        wavelets = wavelet(z_ij_ext);
+        dilation = repmat(permute(weights{1},[3 2 1]),[N,1,1]);
+        translation = repmat(permute(weights{2},[3 2 1]),[N,1,1]);
+        inputs = repmat(xt,[1,1,arch(2)]);
+        z_ij = (inputs-translation)./dilation;
+        
+        wavelets = wavelet(z_ij);
         wavelons = prod(wavelets,3); %single level of hidden wavelons only
-        output = weights{3}*wavelons + weights{4}*xt + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
+        output = wavelons*weights{3} + xt*weights{4} + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
         
 
         %Back-Propagation Computations
@@ -85,7 +88,7 @@ function [nneFun, MSE] = nneWaveletNetBP(xt,d,arch,varargin)
         %Compute partial derivatives of error terms
         de{5} = mean(e,1); %bias terms
         de{4} = xt'*e/N; %pass-through terms
-        de{3} = wavelons.'*e/N; %wavelon-output terms
+        de{3} = wavelons'*e/N; %wavelon-output terms
         de{2} = -weights{3}./weights{1} uhhhh; %wavelon scale terms
         de{1} = (z_ij.*de{2}).'*e/N; %wavelon translation terms            
 
