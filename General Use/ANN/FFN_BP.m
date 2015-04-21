@@ -179,9 +179,9 @@ function [nneFun, MSE, weights, phi, params] = FFN_BP(xt,d,arch,varargin)
     fprintf('\n');
 
     %Build Final Function
-    str = 'phi([x,-1]*weights{1})';
+    str = 'phi([x,-ones(size(x,1),1)]*weights{1})';
     for n = 2:L-1
-        str = ['phi([' str ',-1]*weights{',num2str(n),'})'];
+        str = ['phi([' str ',-ones(size(x,1),1)]*weights{',num2str(n),'})'];
     end
     nneFun = eval(['@(x) ' str]);
 end
