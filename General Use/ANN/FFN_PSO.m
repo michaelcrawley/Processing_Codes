@@ -107,7 +107,7 @@ function [nneFun, MSE, weights] = FFN_PSO(xt,d,arch,varargin)
             global_best.value = itr_best_value;
             global_best.position = swarm(I).position;
         end
-        MSE(n) = global_best.value;
+        MSE(n) = itr_best_value;
         
         %%Convergence Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -19,7 +19,7 @@ function [nneFun, MSE] = WN_BP(xt,d,arch,varargin)
 %                       and two hidden layers with two neurons, the network
 %                       architecture would be [2,2].
 %           options:
-%               'mother':   Mother wavelet, default is Morlet-6
+%               'mother':   Mother wavelet, default is Mexican hat
 %               'A':        Amplitude for the default activation function.
 %                           Default is 1.0.
 %               'maxepoch': Maximum number of epochs for training. Default
