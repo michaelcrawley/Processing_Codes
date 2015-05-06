@@ -58,7 +58,7 @@ function [nneFun, MSE, weights] = FFN_PSO(xt,d,arch,varargin)
     for n = 2:L-1
         str = ['phi([' str ',-ones(N,1)]*weights{',num2str(n),'})'];
     end
-    nneFun = eval(['@(x,weights,d) ' str, ' -d']);
+    nneFun = eval(['@(x,weights,d) d - ' str]);
 
     %Initialize local and global best values and positions
     parfor n = 1:np
@@ -102,7 +102,7 @@ function [nneFun, MSE, weights] = FFN_PSO(xt,d,arch,varargin)
         end
                 
         %%Update MSE and Global bests        
-        [itr_best_value,I] = min([swarm.best_value]);
+        [itr_best_value,I] = min([swarm.value]);
         if itr_best_value < global_best.value
             global_best.value = itr_best_value;
             global_best.position = swarm(I).position;
@@ -181,7 +181,7 @@ function [maxepoch,econv_total,phi,swarm,np,chi,alpha,c] = get_options(arch,comm
         loc = find(cmd == 4)+1;
         wrange = commands{loc};
     else
-        wrange = 4.8/max(arch(1),1)*10; %fix in case no hidden layers exist
+        wrange = 4.8/max(arch(1),1)*1; %fix in case no hidden layers exist
     end
     
     %Error limit for convergence based off of MSE
@@ -223,7 +223,7 @@ function [maxepoch,econv_total,phi,swarm,np,chi,alpha,c] = get_options(arch,comm
                 %velocities are initialized as being double this
                 %column length is incremented by one for bias term 
                 swarm(q).position{n} = wrange*rand(arch(n)+1,arch(n+1))-wrange/2; 
-                swarm(q).velocity{n} = 2*wrange*rand(arch(n)+1,arch(n+1))-wrange; 
+                swarm(q).velocity{n} = wrange*rand(arch(n)+1,arch(n+1))-wrange/2; 
             end
         end
     end
@@ -235,9 +235,9 @@ function [maxepoch,econv_total,phi,swarm,np,chi,alpha,c] = get_options(arch,comm
         alpha  = commands{loc}(2);
         c = commands{loc}(3:4);
     else
-        chi = 0.5;
-        alpha = 0.5;
-        c = [0.5 0.5];
+        chi = 0.998;
+        alpha = 0.75;
+        c = [0.125 0.125];
     end
 
 end
