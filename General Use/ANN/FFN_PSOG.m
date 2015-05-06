@@ -49,7 +49,7 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
     arch = [a1;arch(:);a2]; %append input and output neurons
     
     %Initialize Parameters
-    [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta] = get_options(arch,varargin);
+    [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get_options(arch,varargin);
     MSE = zeros(maxepoch,1); %Container for Mean-Squared-Error over epochs
     L = length(arch);    
     
@@ -103,7 +103,7 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
                 %compute activation level
                 swarm(q).y{k+1} = phi(swarm(q).v{k});
             end
-            swarm(q).error = swarm(q).y{end}-d;
+            swarm(q).error = d - swarm(q).y{end};
             
             %%Back-Propagation Computations
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -122,7 +122,7 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
             %%Update Position and Velocity
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             for k = 1:L-1                
-                swarm(q).velocity{k} = chi*(alpha*swarm(q).velocity{k} + eta*swarm(q).egrad{k} + c(1)*rand(1)*(swarm(q).best_position{k}-swarm(q).position{k}) + c(2)*rand(1)*(global_best.position{k}-swarm(q).position{k}));
+                swarm(q).velocity{k} = chi*(alpha*swarm(q).velocity{k} + c(1)*rand(1)*(swarm(q).best_position{k}-swarm(q).position{k}) + c(2)*rand(1)*(global_best.position{k}-swarm(q).position{k})) + eta*swarm(q).egrad{k};
                 swarm(q).position{k} = swarm(q).position{k} + swarm(q).velocity{k};
             end
             
@@ -154,6 +154,16 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
             break;
         end
         
+        %%Cull Swarm
+        %%%%%%%%%%%%
+        if predator.flag
+            if ~rem(n,predator.epoch)
+                np = ceil(predator.alpha*length(swarm));
+                [~,I] = sort([swarm.value]);
+                swarm = swarm(I(1:np));
+            end            
+        end
+        
         %Update user if not converged
         if n > 1
             dmse = MSE(n)-MSE(n-1);
@@ -175,9 +185,9 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
     nneFun = eval(['@(x) ' str]);    
 end
 
-function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta] = get_options(arch,commands)
+function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get_options(arch,commands)
     %Determine inputs
-    options = {'slope','amplitude','maxepoch','wrange','etotal','phi','particles','weights','velocity'};
+    options = {'slope','amplitude','maxepoch','wrange','etotal','phi','particles','weights','velocity','predator'};
     cmd = zeros(1,length(commands));
     for n = 1:length(commands)
         if ischar(commands{n})
@@ -263,7 +273,7 @@ function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta] = get_options(
                 %velocities are initialized as being double this
                 %column length is incremented by one for bias term 
                 swarm(q).position{n} = wrange*rand(arch(n)+1,arch(n+1))-wrange/2; 
-                swarm(q).velocity{n} = wrange*rand(arch(n)+1,arch(n+1))-wrange/2; 
+                swarm(q).velocity{n} = 2*wrange*rand(arch(n)+1,arch(n+1))-wrange; 
             end
         end
     end
@@ -276,10 +286,20 @@ function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta] = get_options(
         c = commands{loc}(3:4);
         eta = commands{loc}(5);
     else
-        chi = 0.5;
-        alpha = 0.5;
-        c = [0.5 0.5];
-        eta = 0.2;
+        chi = 0.995;
+        alpha = 0.75;
+        c = [0.125 0.125];
+        eta = 0.01;
+    end
+    
+    %Predator parameters
+    if any(cmd == 10)
+        loc = find(cmd == 10)+1;
+        predator = commands{loc};
+    else
+       predator.flag = true;
+       predator.alpha = .9;
+       predator.epoch = 10;
     end
 
 end
