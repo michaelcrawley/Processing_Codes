@@ -44,8 +44,8 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
     [wavelet,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,varargin);
     MSE = zeros(maxepoch,1); %Container for Mean-Squared-Error over epochs    
     
-    %Build Output Function
-    inputs = repmat(xt,[1,1,arch(2)]);
+    %Build Function
+    inputs = permute(repmat(xt,[1,1,arch(2)]),[1 3 2]);
     dilation = @(w) repmat(permute(w{1},[3 2 1]),[N,1,1]);
     translation = @(w) repmat(permute(w{2},[3 2 1]),[N,1,1]);       
     wavelons = @(w) prod(wavelet((inputs-translation(w))./dilation(w)),3);
@@ -126,7 +126,11 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
 
     %Build Final Function
     weights = global_best.position;
-    nneFun = @(x) wavelons(weights)*weights{3} + x*weights{4} + weights{5} - d;    
+    inputs_out = @(x) permute(repmat(x,[1,1,arch(2)]),[1 3 2]);
+    translation_out = @(w,x) repmat(permute(w{2},[3 2 1]),[size(x,1),1,1]);
+    dilation_out = @(w,x) repmat(permute(w{1},[3 2 1]),[size(x,1),1,1]);
+    wavelons_out = @(w,x) prod(wavelet((inputs_out(x)-translation_out(w,x))./dilation_out(w,x)),3);
+    nneFun = @(x) wavelons_out(weights,x)*weights{3} + x*weights{4} + weights{5};    
 end
 
 function [wavelet,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,commands)
@@ -234,9 +238,9 @@ function [wavelet,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,
         alpha  = commands{loc}(2);
         c = commands{loc}(3:4);
     else
-        chi = 0.5;
-        alpha = 0.5;
-        c = [0.5 0.5];
+        chi = 0.98;
+        alpha = 0.75;
+        c = [0.125 0.125];
     end
 
 end
