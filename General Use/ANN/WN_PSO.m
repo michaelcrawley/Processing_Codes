@@ -49,7 +49,7 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
     dilation = @(w) repmat(permute(w{1},[3 2 1]),[N,1,1]);
     translation = @(w) repmat(permute(w{2},[3 2 1]),[N,1,1]);       
     wavelons = @(w) prod(wavelet((inputs-translation(w))./dilation(w)),3);
-    nneFun = @(x,weights,d) wavelons(weights)*weights{3} + x*weights{4} + weights{5} - d; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
+    nneFun = @(x,weights,d) wavelons(weights)*weights{3} + x*weights{4} + repmat(weights{5},size(x,1),1) - d; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
 
     %Initialize local and global best values and positions
     for n = 1:np
@@ -130,7 +130,7 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
     translation_out = @(w,x) repmat(permute(w{2},[3 2 1]),[size(x,1),1,1]);
     dilation_out = @(w,x) repmat(permute(w{1},[3 2 1]),[size(x,1),1,1]);
     wavelons_out = @(w,x) prod(wavelet((inputs_out(x)-translation_out(w,x))./dilation_out(w,x)),3);
-    nneFun = @(x) wavelons_out(weights,x)*weights{3} + x*weights{4} + weights{5};    
+    nneFun = @(x) wavelons_out(weights,x)*weights{3} + x*weights{4} + repmat(weights{5},size(x,1),1);    
 end
 
 function [wavelet,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,commands)
@@ -214,20 +214,20 @@ function [wavelet,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,
     else
         L = length(arch);
         swarm(np) = struct('position',[],'velocity',[],'value',[],'best_position',[],'best_value',[]); %initialize
-        for q = 1:np
+        parfor q = 1:np
             swarm(q).position = cell(L-1,1); %use different cell for each layer
             swarm(q).position{1} = rand(arch(1),arch(2)) - 0.5;
             swarm(q).position{2} = rand(arch(1),arch(2)) - 0.5;
             swarm(q).position{3} = rand(arch(2),arch(end)) - 0.5;
             swarm(q).position{4} = rand(arch(1),arch(end)) - 0.5;
-            swarm(q).position{5} = rand(arch(end),1)-0.5;
+            swarm(q).position{5} = rand(1,arch(end))-0.5;
             
             swarm(q).velocity = cell(L-1,1); %use different cell for each layer
             swarm(q).velocity{1} = rand(arch(1),arch(2)) - 0.5;
             swarm(q).velocity{2} = rand(arch(1),arch(2)) - 0.5;
             swarm(q).velocity{3} = rand(arch(2),arch(end)) - 0.5;
             swarm(q).velocity{4} = rand(arch(1),arch(end)) - 0.5;
-            swarm(q).velocity{5} = rand(arch(end),1)-0.5;
+            swarm(q).velocity{5} = rand(1,arch(end))-0.5;
         end
     end
     
