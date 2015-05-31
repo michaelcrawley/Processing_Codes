@@ -71,6 +71,12 @@ function Wavelet_Decompose2DInst_V4(src_dir,flist,out_dir,optset,cpus)
             for q = 1:N(1)
                 tmp(q,:) = interp1(x,sig(q,:,n),int_x,optset.interp_method);
             end
+            
+            %%%%%%TEMPORARY
+            %%%%%%TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            tmp(:,13:end) = 0;
+            
+            
             intwaveform(:,:,n) = tmp;
             
             %Apply window, zero-pad            

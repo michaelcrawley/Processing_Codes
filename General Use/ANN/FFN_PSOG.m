@@ -224,7 +224,7 @@ function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get
         loc = find(cmd == 4)+1;
         wrange = commands{loc};
     else
-        wrange = 4.8/max(arch(1),1)*10; %fix in case no hidden layers exist
+        wrange = 4.8/max(arch(1),1)*1; %fix in case no hidden layers exist
     end
     
     %Error limit for convergence based off of MSE
@@ -260,7 +260,7 @@ function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get
     else
         L = length(arch);
         swarm(np) = struct('position',[],'velocity',[],'value',[],'best_position',[],'best_value',[],'error',[],'egrad',[],'y',[],'v',[],'delta',[]); %initialize
-        for q = 1:np
+        parfor q = 1:np
             swarm(q).position = cell(L-1,1); %use different cell for each layer
             swarm(q).velocity = cell(L-1,1); %use different cell for each layer
             swarm(q).v = cell(L-1,1);
