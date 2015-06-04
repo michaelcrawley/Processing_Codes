@@ -30,9 +30,9 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
     flist = findfiles(src_dir,condition);
     
     %find folders and contents within
+    cutoff = length(src_dir)+2; %cutoff for folder name
     if any(strcmpi(varargin,'-all')) || any(strcmpi(varargin,'-a'))        
-        tmp = genpath(src_dir);
-        cutoff = length(src_dir)+2; %cutoff for folder name
+        tmp = genpath(src_dir);        
         folders = regexp(tmp,pathsep,'split'); %find subdirs
         folders = folders(2:end); %remove top level directory from subdir list
         folder_keep = true(1,length(folders)); %logical check for folder contents
@@ -64,7 +64,7 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
     %If user is requesting folders, output file list should be changed
     if nargout > 2
         for n = 1:length(folders)
-            group = cellfun(@(x) ~isempty(strfind(folders{n},fileparts(x))),flist);
+            group = cellfun(@(x) strcmp(folders{n}(cutoff:end),fileparts(x)),flist);
             swap{n} = flist(group);
         end
         flist = swap;
