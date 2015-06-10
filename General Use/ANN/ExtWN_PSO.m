@@ -1,4 +1,4 @@
-function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
+function [nneFun, MSE, w] = ExtWN_PSO(xt,d,arch,varargin)
 %This code constructs a static, fully-connected wavelet network. 
 %Learning is accomplished solely using particle swarm
 %optimization. The user must open a worker pool prior to calling this
@@ -46,10 +46,10 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
     L = length(arch);
     
     %Build neural net function      
-    wavelons = @(x,w) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{2},[3 2 1]),[N,1,1]))./repmat(permute(w{1},[3 2 1]),[N,1,1])),3);
-    nneFun = @(x,w) phi([wavelons(x,w),x,-ones(N,1)]*w{3});
+    wavelons = @(x,w) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[N,1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[N,1,1])),3);
+    nneFun = @(x,w) phi([wavelons(x,w),x,-ones(N,1)]*w{2});
     for n = 3:L-1
-        nneFun = @(x,w) phi(nnefun(x,w)*w{n+1});
+        nneFun = @(x,w) phi([nneFun(x,w),-ones(N,1)]*w{n});
     end
     nneFun = @(x,w,d) nneFun(x,w) - d;
     
@@ -79,9 +79,9 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
         
         %%FeedForward Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
-        parfor q = 1:np
+        for q = 1:np
             %Update Position and Velocity
-            for k = 1:L
+            for k = 1:L-1
                 swarm(q).velocity{k} = chi*(alpha*swarm(q).velocity{k} + c(1)*rand(1)*(swarm(q).best_position{k}-swarm(q).position{k}) + c(2)*rand(1)*(global_best.position{k}-swarm(q).position{k}));
                 swarm(q).position{k} = swarm(q).position{k} + swarm(q).velocity{k};
             end
@@ -128,10 +128,10 @@ function [nneFun, MSE, weights] = WN_PSO(xt,d,arch,varargin)
 
     %Build Final Function
     w = global_best.position;
-    wavelons = @(x) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{2},[3 2 1]),[size(x,1),1,1]))./repmat(permute(w{1},[3 2 1]),[size(x,1),1,1])),3);
-    nneFun = @(x) phi([wavelons(x,w),x,-ones(size(x,1),1)]*w{3});
+    wavelons = @(x) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[size(x,1),1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[size(x,1),1,1])),3);
+    nneFun = @(x) phi([wavelons(x),x,-ones(size(x,1),1)]*w{2});
     for n = 3:L-1
-        nneFun = @(x) phi(nnefun(x)*w{n+1});
+        nneFun = @(x) phi([nneFun(x),-ones(size(x,1))]*w{n});
     end    
 end
 
@@ -218,15 +218,15 @@ function [wavelet,phi,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(a
         swarm(np) = struct('position',[],'velocity',[],'value',[],'best_position',[],'best_value',[]); %initialize
         parfor q = 1:np
             swarm(q).position = cell(L-1,1); %use different cell for each layer
-            swarm(q).position{1} = rand(arch(1),arch(2)) - 0.5;
-            swarm(q).position{2} = rand(arch(1),arch(2)) - 0.5;
-            swarm(q).position{3} = rand(arch(2)+arch(1)+1,arch(3)) - 0.5;         
+            swarm(q).position{1}(:,:,1) = rand(arch(1),arch(2)) - 0.5;
+            swarm(q).position{1}(:,:,2) = rand(arch(1),arch(2)) - 0.5;
+            swarm(q).position{2} = rand(arch(2)+arch(1)+1,arch(3)) - 0.5;         
             swarm(q).velocity = cell(L-1,1); %use different cell for each layer
-            swarm(q).velocity{1} = rand(arch(1),arch(2)) - 0.5;
-            swarm(q).velocity{2} = rand(arch(1),arch(2)) - 0.5;
-            swarm(q).velocity{3} = rand(arch(2)+arch(1)+1,arch(3)) - 0.5;
+            swarm(q).velocity{1}(:,:,1) = rand(arch(1),arch(2)) - 0.5;
+            swarm(q).velocity{1}(:,:,2) = rand(arch(1),arch(2)) - 0.5;
+            swarm(q).velocity{2} = rand(arch(2)+arch(1)+1,arch(3)) - 0.5;
             
-            for n = 4:L-1
+            for n = 3:L-1
                 %weights are randomly initialized to be between (-wrange,wrange)
                 %velocities are initialized as being double this
                 %column length is incremented by one for bias term 
