@@ -19,6 +19,7 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     raw = reshape(raw,BS,NCH,[]);
     signal = squeeze(raw(:,lCH,piv.badvec_chk));
     NF = raw(:,NFCH,piv.badvec_chk);
+%     NF = raw(:,6:16,piv.badvec_chk); %fix to test how important 1st microphone is
     
     %Identify trigger indices
     trigger = diff(signal);
@@ -33,6 +34,8 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     xt = zeros(Nblock,(2*width+1)*length(NFCH));
     for n = 1:Nblock
         tmp = NF(test(n)-DS*width:DS:test(n)+DS*width,:,n);
+        
+
         xt(n,:) = tmp(:)';
     end
     
@@ -45,11 +48,46 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     
     %Normalize 
     xt_norm = std(xt(:));
-    d_norm = std(d(:));
+    d_norm = max(d(:));
     xt = xt/xt_norm;
     d = d/d_norm;
     
     %ANN
-    [nneFun, MSE, weights] = FFN_BP(xt,d,64);
+    keyboard
+    [nneFun, MSE, weights] = FFN_BP(xt,d,64,'amplitude',1.1);
+    
+    
+    
+
+    for n = 1:size(out2,2)
+        pcolor(x,y,out2(:,:,n)); 
+        shading interp; colormap jet; colorbar; caxis(clims);
+        xlabel('x/D'); ylabel('y/D');
+        title(['t = ',num2str(t(n)*1e6),' \mus']);
+        
+        frame = getframe;
+        writeVideo(aviobj,frame);
+    end
+    close(aviobj);
+    
+    h = figure;
+    movegui(h, 'onscreen');
+    rect = get(h,'Position'); 
+    rect(1:2) = [0 0]; 
+    aviobj = VideoWriter('test.avi');
+    open(aviobj);
+    for n = 1:size(out2,2)
+        pcolor(x,y,out2(:,:,n)); 
+        shading interp; colormap jet; colorbar; caxis(clims);
+        xlabel('x/D'); ylabel('y/D');
+        title(['t = ',num2str(t(n)*1e6),' \mus']);
+        
+        movegui(h, 'onscreen');
+        hold all;
+
+        drawnow;
+        writeVideo(aviobj,getframe(gcf,rect));
+    end
+    close(aviobj);
 
 end
