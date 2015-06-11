@@ -208,7 +208,7 @@ function [wavelet,phi,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(a
         loc = find(cmd == 6);
         phi = commands{loc+1};
     else
-        phi = @(v) A*tanh(v); %scales between -A and A
+        phi = sidestep_memory_phi(A); %scales between -A and A
     end
     
     %Number of particles in swarm
@@ -258,6 +258,10 @@ function [wavelet,phi,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(a
         c = [0.125 0.125];
     end
 
+end
+
+function out = sidestep_memory_phi(A)
+    out = @(v) A*tanh(v);
 end
 
 function [wavelet,dwavelet] = MotherWavelets(mother,m)

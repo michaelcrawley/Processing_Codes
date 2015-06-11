@@ -179,11 +179,20 @@ function [nneFun, MSE, weights, phi, params] = FFN_BP(xt,d,arch,varargin)
     fprintf('\n');
 
     %Build Final Function
+    nneFun = build_final_neural_function(L,phi,weights);
+end
+
+function nne_out = build_final_neural_function(L,phi,weights)
     str = 'phi([x,-ones(size(x,1),1)]*weights{1})';
     for n = 2:L-1
         str = ['phi([' str ',-ones(size(x,1),1)]*weights{',num2str(n),'})'];
     end
-    nneFun = eval(['@(x) ' str]);
+    nne_out = eval(['@(x) ' str]);
+end
+
+function [out,dout] = sidestep_memory_phi(A,s)
+    out = @(v) A*tanh(s*v); %scales between -A and A
+    dout = @(v) A*s*sech(s*v).^2; %derivative with respect to v
 end
 
 function [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = get_options(arch,commands)
@@ -274,8 +283,7 @@ function [maxepoch,eta,alpha,econv_total,econv_change,mode,phi,dphi,weights] = g
         phi = commands{loc+1};
         dphi = commands{loc+2};
     else
-        phi = @(v) A*tanh(s*v); %scales between -A and A
-        dphi = @(v) A*s*sech(s*v).^2; %derivative with respect to v
+        [phi,dphi] = sidestep_memory_phi(A,s);
     end
     
     %Initial weights

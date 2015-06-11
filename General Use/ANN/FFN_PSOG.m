@@ -178,11 +178,20 @@ function [nneFun, MSE, weights] = FFN_PSOG(xt,d,arch,varargin)
 
     %Build Final Function
     weights = global_best.position;
+    nneFun = build_final_neural_function(L,phi,weights);    
+end
+
+function nneFun = build_final_neural_function(L,phi,weights)
     str = 'phi([x,-ones(size(x,1),1)]*weights{1})';
     for n = 2:L-1
         str = ['phi([' str ',-ones(size(x,1),1)]*weights{',num2str(n),'})'];
     end
-    nneFun = eval(['@(x) ' str]);    
+    nneFun = eval(['@(x) ' str]);
+end
+
+function [out,dout] = sidestep_memory_phi(A,s)
+    out = @(v) A*tanh(s*v); %scales between -A and A
+    dout = @(v) A*s*sech(s*v).^2; %derivative with respect to v
 end
 
 function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get_options(arch,commands)
@@ -241,8 +250,7 @@ function [maxepoch,econv_total,phi,dphi,swarm,np,chi,alpha,c,eta,predator] = get
         phi = commands{loc+1};
         dphi = commands{loc+2};
     else
-        phi = @(v) A*tanh(s*v); %scales between -A and A
-        dphi = @(v) A*s*sech(s*v).^2; %derivative with respect to v
+        [phi,dphi] = sidestep_memory_phi(A,s);
     end
     
     %Number of particles in swarm

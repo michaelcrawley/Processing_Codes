@@ -54,11 +54,7 @@ function [nneFun, MSE, weights] = FFN_PSO(xt,d,arch,varargin)
     L = length(arch);    
     
     %Build Output Function
-    str = 'phi([x,-ones(N,1)]*weights{1})';
-    for n = 2:L-1
-        str = ['phi([' str ',-ones(N,1)]*weights{',num2str(n),'})'];
-    end
-    nneFun = eval(['@(x,weights,d) d - ' str]);
+    nneFun = build_neural_function(L,phi,N);
 
     %Initialize local and global best values and positions
     parfor n = 1:np
@@ -135,11 +131,25 @@ function [nneFun, MSE, weights] = FFN_PSO(xt,d,arch,varargin)
 
     %Build Final Function
     weights = global_best.position;
+    nneFun = build_final_neural_function(L,phi,weights);    
+end
+
+function nneFun = build_final_neural_function(L,phi,weights)
     str = 'phi([x,-ones(size(x,1),1)]*weights{1})';
     for n = 2:L-1
         str = ['phi([' str ',-ones(size(x,1),1)]*weights{',num2str(n),'})'];
     end
-    nneFun = eval(['@(x) ' str]);    
+    nneFun = eval(['@(x) ' str]);
+end
+
+function nneFun = build_neural_function(L,phi,N)
+
+    str = 'phi([x,-ones(N,1)]*weights{1})';
+    for n = 2:L-1
+        str = ['phi([' str ',-ones(N,1)]*weights{',num2str(n),'})'];
+    end
+    nneFun = eval(['@(x,weights,d) d - ' str]);
+    
 end
 
 function [maxepoch,econv_total,phi,swarm,np,chi,alpha,c] = get_options(arch,commands)
