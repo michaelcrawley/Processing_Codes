@@ -45,13 +45,8 @@ function [nneFun, MSE, w] = ExtWN_PSO(xt,d,arch,varargin)
     MSE = zeros(maxepoch,1); %Container for Mean-Squared-Error over epochs  
     L = length(arch);
     
-    %Build neural net function      
-    wavelons = @(x,w) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[N,1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[N,1,1])),3);
-    nneFun = @(x,w) phi([wavelons(x,w),x,-ones(N,1)]*w{2});
-    for n = 3:L-1
-        nneFun = @(x,w) phi([nneFun(x,w),-ones(N,1)]*w{n});
-    end
-    nneFun = @(x,w,d) nneFun(x,w) - d;
+    %Build neural net function   
+    nneFun = build_neural_function(arch,wavelet,phi,N);
     
     %Initialize local and global best values and positions
     for n = 1:np
@@ -127,12 +122,27 @@ function [nneFun, MSE, w] = ExtWN_PSO(xt,d,arch,varargin)
     fprintf('\n');  
 
     %Build Final Function
-    w = global_best.position;
-    wavelons = @(x) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[size(x,1),1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[size(x,1),1,1])),3);
-    nneFun = @(x) phi([wavelons(x),x,-ones(size(x,1),1)]*w{2});
+    w = global_best.position; 
+    nneFun = build_final_neural_function(arch,wavelet,phi,w);
+end
+
+function [nne_out] = build_neural_function(arch,wavelet,phi,N)
+    L = length(arch);
+    wavelons = @(x,w) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[N,1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[N,1,1])),3);
+    nne_out = @(x,w) phi([wavelons(x,w),x,-ones(N,1)]*w{2});
     for n = 3:L-1
-        nneFun = @(x) phi([nneFun(x),-ones(size(x,1))]*w{n});
-    end    
+        nne_out = @(x,w) phi([nne_out(x,w),-ones(N,1)]*w{n});
+    end
+    nne_out = @(x,w,d) nne_out(x,w) - d;
+end
+
+function [nne_out] = build_final_neural_function(arch,wavelet,phi,w)
+    L = length(arch);
+    wavelons = @(x) prod(wavelet((permute(repmat(x,[1,1,arch(2)]),[1 3 2])-repmat(permute(w{1}(:,:,2),[3 2 1]),[size(x,1),1,1]))./repmat(permute(w{1}(:,:,1),[3 2 1]),[size(x,1),1,1])),3);
+    nne_out = @(x) phi([wavelons(x),x,-ones(size(x,1),1)]*w{2});
+    for n = 3:L-1
+        nne_out = @(x) phi([nne_out(x),-ones(size(x,1))]*w{n});
+    end 
 end
 
 function [wavelet,phi,maxepoch,econv_total,swarm,np,chi,alpha,c] = get_options(arch,commands)
