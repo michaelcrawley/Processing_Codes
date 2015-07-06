@@ -1,4 +1,4 @@
-function [nneFun, MSE] = WN_BP(xt,d,arch,varargin)
+function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
 %This code implements a multidimensional wavelet network per Alexandridis
 %2013 (Neural Networks). Learning is performed using the standard
 %backpropagation algorithm in batch mode. The network is fully connected, 
@@ -49,6 +49,12 @@ function [nneFun, MSE] = WN_BP(xt,d,arch,varargin)
     [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
     weights_old = weights; %initialize here so that momentum can be included immediately
     
+        %   Level 1: scale weight for hidden wavelons
+        %   Level 2: translation weight for hidden wavelons
+        %   Level 3: Linear amplitude weight for hidden-output neurons
+        %   Level 4: Linear amplitude weight for input-output
+        %   Level 5: Bias weights at output
+    
     %Set up progress bar
     cpb = ConsoleProgressBar();
     cpb.setLeftMargin(4);   % progress bar left margin
@@ -68,30 +74,31 @@ function [nneFun, MSE] = WN_BP(xt,d,arch,varargin)
         
         %Feed-Forward Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        dilation = repmat(permute(weights{1},[3 2 1]),[N,1,1]);
-        translation = repmat(permute(weights{2},[3 2 1]),[N,1,1]);
-        inputs = repmat(xt,[1,1,arch(2)]);
-        z_ij = (inputs-translation)./dilation;
-        
-        wavelets = wavelet(z_ij);
-        wavelons = prod(wavelets,3); %single level of hidden wavelons only
-        output = wavelons*weights{3} + xt*weights{4} + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
+        z_ik = (repmat(xt,[1 1 arch(2)]) - repmat(permute(weights{2},[3 1 2]),[N 1 1]))./ repmat(permute(weights{1},[3 1 2]),[N 1 1]);
+        wavelets = wavelet(z_ik);        
+        wavelons = prod(wavelets,3);        
+        y = wavelons*weights{3} + xt*weights{4} + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
         
 
         %Back-Propagation Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         %Compute Mean-squared error
-        e = d-output; %error signal at output level
+        e = d-y; %error signal at output level
         MSE(n) = mean(sum(e.^2,2))/2; 
 
         %Compute partial derivatives of error terms
+        dwavelets = dwavelet(z_ik);
         de{5} = mean(e,1); %bias terms
         de{4} = xt'*e/N; %pass-through terms
         de{3} = wavelons'*e/N; %wavelon-output terms
-        de{2} = -weights{3}./weights{1} uhhhh; %wavelon scale terms
-        de{1} = (z_ij.*de{2}).'*e/N; %wavelon translation terms            
+        for k = 1:arch(2)
+            for i = 1:arch(1)
+                wavelet_locator = abs((1:arch(1))-i) > 0;                
+                de{2}(i,k) = -mean(prod([wavelets(:,wavelet_locator,k),dwavelets(:,~wavelet_locator,k)],2)/weights{2}(i,k)*(weights{3}*e),1);%wavelon scale terms
+                de{1}(i,k) = -mean(z_ik(:,i,k)*prod([wavelets(:,wavelet_locator,k),dwavelets(:,~wavelet_locator,k)],2)/weights{2}(i,k)*(weights{3}*e),1);%wavelon translation terms
+            end
+        end          
 
         %Update weights
         swap = weights;
