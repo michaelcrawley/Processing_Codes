@@ -74,7 +74,7 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
         
         %Feed-Forward Computations
         %%%%%%%%%%%%%%%%%%%%%%%%%%
-        z_ik = (repmat(xt,[1 1 arch(2)]) - repmat(permute(weights{2},[3 1 2]),[N 1 1]))./ repmat(permute(weights{1},[3 1 2]),[N 1 1]);
+        z_ik = (permute(repmat(xt,[1 1 arch(2)]),[1 3 2]) - repmat(permute(weights{2},[3 2 1]),[N 1 1]))./ repmat(permute(weights{1},[3 2 1]),[N 1 1]);
         wavelets = wavelet(z_ik);        
         wavelons = prod(wavelets,3);        
         y = wavelons*weights{3} + xt*weights{4} + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
@@ -95,15 +95,15 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
         for k = 1:arch(2)
             for i = 1:arch(1)
                 wavelet_locator = abs((1:arch(1))-i) > 0;                
-                de{2}(i,k) = -mean(prod([wavelets(:,wavelet_locator,k),dwavelets(:,~wavelet_locator,k)],2)/weights{2}(i,k)*(weights{3}*e),1);%wavelon scale terms
-                de{1}(i,k) = -mean(z_ik(:,i,k)*prod([wavelets(:,wavelet_locator,k),dwavelets(:,~wavelet_locator,k)],2)/weights{2}(i,k)*(weights{3}*e),1);%wavelon translation terms
+                de{2}(i,k) = -mean(prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(weights{3}(k,:)*e),1);%wavelon scale terms
+                de{1}(i,k) = -mean(z_ik(:,k,i).*prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(weights{3}(k,:)*e),1);%wavelon translation terms
             end
         end          
 
         %Update weights
         swap = weights;
-        for n = 1:5
-            weights{n} = weights{n} + eta*de{n} + alpha*(weights{n}-weights_old{n});
+        for q = 1:5
+            weights{q} = weights{q} + eta*de{q} + alpha*(weights{q}-weights_old{q});
         end
         weights_old = swap;
             
@@ -133,7 +133,7 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
     fprintf('\n');
 
     %Build Final Function
-    nneFun = @(x) prod(wavelet((repmat(x,arch(1),1)-weights{2})./weights{1}),2).'*weights{3} + x*weights{4} + weights{5};
+    nneFun = @(x) prod(wavelet((permute(repmat(x,[1 1 arch(2)]),[1 3 2]) - repmat(permute(weights{2},[3 2 1]),[size(x,1) 1 1]))./ repmat(permute(weights{1},[3 2 1]),[size(x,1) 1 1])),3)*weights{3} + x*weights{4} + weights{5};
 end
 
 
@@ -173,7 +173,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
 
     %learning-rate-parameter
     if any(cmd == 3)
-        loc = find(cmd == 4)+1;
+        loc = find(cmd == 3)+1;
         eta = commands{loc};
     else
         eta = 0.1;
@@ -206,7 +206,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
         %   Level 3: Linear amplitude weight for hidden-output neurons
         %   Level 4: Linear amplitude weight for input-output
         %   Level 5: Bias weights at output
-        weights{1} = rand(arch(1),arch(2)) - 0.5;
+        weights{1} = rand(arch(1),arch(2));
         weights{2} = rand(arch(1),arch(2)) - 0.5;
         weights{3} = rand(arch(2),arch(end)) - 0.5;
         weights{4} = rand(arch(1),arch(end)) - 0.5;
