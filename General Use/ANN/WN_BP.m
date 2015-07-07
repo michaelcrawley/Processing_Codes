@@ -46,7 +46,8 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
     
     %Initialize variables
     arch = [a1;arch(:);a2]; %append input and output neurons
-    [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,varargin);
+    range = [min(xt(:)) max(xt(:))];
+    [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,range,varargin);
     weights_old = weights; %initialize here so that momentum can be included immediately
     
         %   Level 1: scale weight for hidden wavelons
@@ -77,7 +78,7 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
         z_ik = (permute(repmat(xt,[1 1 arch(2)]),[1 3 2]) - repmat(permute(weights{2},[3 2 1]),[N 1 1]))./ repmat(permute(weights{1},[3 2 1]),[N 1 1]);
         wavelets = wavelet(z_ik);        
         wavelons = prod(wavelets,3);        
-        y = wavelons*weights{3} + xt*weights{4} + weights{5}; %includes linear terms from input and bias terms in addition to the outputs of the wavelons
+        y = wavelons*weights{3} + xt*weights{4} + repmat(weights{5},N,1); %includes linear terms from input and bias terms in addition to the outputs of the wavelons
         
 
         %Back-Propagation Computations
@@ -95,8 +96,8 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
         for k = 1:arch(2)
             for i = 1:arch(1)
                 wavelet_locator = abs((1:arch(1))-i) > 0;                
-                de{2}(i,k) = -mean(prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(weights{3}(k,:)*e),1);%wavelon scale terms
-                de{1}(i,k) = -mean(z_ik(:,k,i).*prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(weights{3}(k,:)*e),1);%wavelon translation terms
+                de{2}(i,k) = -mean(prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(e*weights{3}(k,:)'),1);%wavelon scale terms
+                de{1}(i,k) = -mean(z_ik(:,k,i).*prod([wavelets(:,k,wavelet_locator),dwavelets(:,k,~wavelet_locator)],2)/weights{2}(i,k).*(e*weights{3}(k,:)'),1);%wavelon translation terms
             end
         end          
 
@@ -133,11 +134,11 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
     fprintf('\n');
 
     %Build Final Function
-    nneFun = @(x) prod(wavelet((permute(repmat(x,[1 1 arch(2)]),[1 3 2]) - repmat(permute(weights{2},[3 2 1]),[size(x,1) 1 1]))./ repmat(permute(weights{1},[3 2 1]),[size(x,1) 1 1])),3)*weights{3} + x*weights{4} + weights{5};
+    nneFun = @(x) prod(wavelet((permute(repmat(x,[1 1 arch(2)]),[1 3 2]) - repmat(permute(weights{2},[3 2 1]),[size(x,1) 1 1]))./ repmat(permute(weights{1},[3 2 1]),[size(x,1) 1 1])),3)*weights{3} + x*weights{4} + repmat(weights{5},size(x,1),1);
 end
 
 
-function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,commands)
+function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options(arch,range,commands)
     %Determine inputs
     options = {'mother','maxepoch','lrp','momentum','etotal','weights'};
     cmd = zeros(1,length(commands));
@@ -165,7 +166,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
     
     %maximum number of epochs for training
     if any(cmd == 2)
-        loc = find(cmd == 3)+1;
+        loc = find(cmd == 2)+1;
         maxepoch = commands{loc};
     else
         maxepoch = 1e6; 
@@ -181,7 +182,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
     
     %momentum parameter
     if any(cmd == 4)
-        loc = find(cmd == 5)+1;
+        loc = find(cmd == 4)+1;
         alpha = commands{loc};
     else
         alpha = 0.0;
@@ -189,7 +190,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
     
     %Error limit for convergence based off of MSE
     if any(cmd == 5)
-        loc = find(cmd == 6)+1;
+        loc = find(cmd == 5)+1;
         econv_total = commands{loc};
     else
         econv_total = sqrt(eps);
@@ -197,7 +198,7 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
     
     %Initial weights
     if any(cmd == 6)
-        loc = find(cmd == 7)+1;
+        loc = find(cmd == 6)+1;
         weights = commands{loc};
     else
         %Weights will organized in five levels:
@@ -206,11 +207,11 @@ function [wavelet,dwavelet,maxepoch,eta,alpha,econv_total,weights] = get_options
         %   Level 3: Linear amplitude weight for hidden-output neurons
         %   Level 4: Linear amplitude weight for input-output
         %   Level 5: Bias weights at output
-        weights{1} = rand(arch(1),arch(2));
-        weights{2} = rand(arch(1),arch(2)) - 0.5;
+        weights{1} = 0.2*diff(range)*rand(arch(1),arch(2));
+        weights{2} = 0.5*sum(range)*rand(arch(1),arch(2)) - 0.25*sum(range);
         weights{3} = rand(arch(2),arch(end)) - 0.5;
         weights{4} = rand(arch(1),arch(end)) - 0.5;
-        weights{5} = rand(arch(end),1)-0.5;
+        weights{5} = rand(1,arch(end))-0.5;
     end
 end
 
