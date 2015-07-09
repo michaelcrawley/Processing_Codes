@@ -30,6 +30,6 @@ function [potential,solenoidal] = Helmholtz_Decomposition2D(x,y,U,V)
     %Now we need to fix the boundary nodes...
     %left boundary
     partial_x_D1_left = TSE(0,2*L,dx,1);
-    
+    Ax(1:N,1:N) = spdiags(repmat(partial_x_D1_left(:)',N(1),1),0:2*L,N(1),N(1));
     
 end
