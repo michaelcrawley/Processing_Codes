@@ -1,5 +1,7 @@
-function PreprocessPIV(src,wfm,reported_dt)
+function PreprocessPIV(src,wfm,reported_dt,ix,iy)
     
+    if ~exist('ix','var'), ix = []; end
+    if ~exist('iy','var'), iy = []; end
 
     %Read in LeCroy waveform to determine true dt, for proper velocity
     %scaling
@@ -24,14 +26,23 @@ function PreprocessPIV(src,wfm,reported_dt)
     for n = 1:length(folders)
         
         %Load data
-        load([flist{n}{1}]);
+        load([src,filesep,flist{n}{1}]);
 
         for q = 1:length(data)
             %Identify bad images based on number of vectors
             nvec = squeeze(sum(sum((data(q).U+data(q).V > 0),2),1));
-            badvec_chk = (nvec/numel(data(q).X)) > 0.75;
-            data(q).U = data(q).U(:,:,badvec_chk);
-            data(q).V = data(q).V(:,:,badvec_chk);  
+            chk1 = (nvec/numel(data(q).X)) > 0.75;
+            
+            %Identify bad images based on jet core velocity averages
+            for k = 1:size(data(1).U,3)
+                tmp = data(1).U(ix,iy,k);
+                [~,test(k,1)] = nzstats(tmp(:),1);
+            end
+            chk2 = test < (mean(test)+1.25*std(test)) & test > (mean(test)-1.25*std(test));
+            badvec_chk(:,q) = chk1 & chk2;            
+            
+            data(q).U = data(q).U(:,:,badvec_chk(:,q));
+            data(q).V = data(q).V(:,:,badvec_chk(:,q));  
             
             %Rescale per correct laser dt
             data(q).U = scaling*data(q).U;

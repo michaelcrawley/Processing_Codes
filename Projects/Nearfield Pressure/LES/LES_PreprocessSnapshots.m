@@ -15,7 +15,7 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
     %%%%%%%%%%%%%%%%%
     
     %Read in grid file data
-    grd = getfiles('*.grd',src);
+    grd = getfiles('*.grd',src,'-a');
     fid = fopen([src filesep grd{1}],'r');
     headers = textscan(fid,'%s',ngheaders); 
     data = textscan(fid,repmat('%f ',1,ngheaders));    
@@ -106,11 +106,11 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
     cpb = ConsoleProgressBar();
     t = zeros(Nf,1);   
     
-    u_theta = zeros([np(order),Nf]);
-    u_r = zeros([np(order),Nf]);
+%     u_theta = zeros([np(order),Nf]);
+%     u_r = zeros([np(order),Nf]);
     
-    header_v = strmatch('v',headers{1});
-    header_w = strmatch('w',headers{1});
+%     header_v = strmatch('v',headers{1});
+%     header_w = strmatch('w',headers{1});
     
     for q = 1:ndheaders
         data = zeros([np(order),Nf]);
@@ -137,25 +137,25 @@ function LES_PreprocessSnapshots(src,out,dsfactor)
             cpb.setValue(n/Nf*100);  	% update progress value
             cpb.setText(text);  % update user text
             
-            %extra computations for polar vectors
-            if q == 1
-                v_tmp = permute(reshape(tmp{header_v},np),order);
-                w_tmp = permute(reshape(tmp{header_w},np),order);
-                
-%                 u_theta(:,:,:,n) = cos(grid.theta).*w_tmp + sin(grid.theta).*v_tmp;
-%                 u_r(:,:,:,n) = -sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
-                u_r(:,:,:,n) = sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
-                u_theta(:,:,:,n) = -w_tmp.*cos(grid.theta) + v_tmp.*sin(grid.theta);                
-            end
+%             %extra computations for polar vectors
+%             if q == 1
+%                 v_tmp = permute(reshape(tmp{header_v},np),order);
+%                 w_tmp = permute(reshape(tmp{header_w},np),order);
+%                 
+% %                 u_theta(:,:,:,n) = cos(grid.theta).*w_tmp + sin(grid.theta).*v_tmp;
+% %                 u_r(:,:,:,n) = -sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
+%                 u_r(:,:,:,n) = sin(grid.theta).*w_tmp + cos(grid.theta).*v_tmp;
+%                 u_theta(:,:,:,n) = -w_tmp.*cos(grid.theta) + v_tmp.*sin(grid.theta);                
+%             end
         end
         save([out,filesep,headers{1}{q},'.mat'],'data','t','grid','flags','trigger'); %need to add in actuator signal, once we get it
     end
     fprintf('\n'); %for formatting
     
-    clear data;
-    data = u_r;
-    save([out,filesep,'u_r.mat'],'data','t','grid','flags','trigger');
-    clear data;
-    data = u_theta;
-    save([out,filesep,'u_theta.mat'],'data','t','grid','flags','trigger');
+%     clear data;
+%     data = u_r;
+%     save([out,filesep,'u_r.mat'],'data','t','grid','flags','trigger');
+%     clear data;
+%     data = u_theta;
+%     save([out,filesep,'u_theta.mat'],'data','t','grid','flags','trigger');
 end

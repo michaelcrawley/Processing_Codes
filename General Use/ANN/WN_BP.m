@@ -4,7 +4,7 @@ function [nneFun, MSE, weights] = WN_BP(xt,d,arch,varargin)
 %backpropagation algorithm in batch mode. The network is fully connected, 
 %and includes linear connections from the input to the output. This code
 %restricts the user to a single populated hidden layer.
-%Last updated on 2015-04-14 by Michael Crawley.
+%Last updated on 2015-07-02
 %[UNFINISHED]
 %Inputs:
 %           xt:         [M,N] matrix of training sets, where M is the

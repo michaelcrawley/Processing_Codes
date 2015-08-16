@@ -1,4 +1,4 @@
-function [D,L,Q,L2] = VortexID(varargin)
+function L = SwirlingStrength(varargin)
 %This program calculates the \Delta-Criterion (D), the Swirling Strength
 %(L), the Q-Criterion (Q), and the \lambda_2-Criterion (L2) based on an
 %input flow field. These methods require incompressibility to work
@@ -134,7 +134,7 @@ switch nargin
 end
 
 %% CORE PROGRAM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-S = size(u); L = zeros(S); Q = L; D = L; L2 = L;    %Initializes output arrays
+S = size(u); L = zeros(S);     %Initializes output arrays
 
     %Calculates second order accurate derivatives for all components
 dudx = zeros(size(u)); dvdx = dudx; dwdx = dudx; dudy = dudx; 
@@ -189,21 +189,9 @@ parfor k = 1:K
 
 	ls = eig(A); %eigenvalues of tensor
 	L(k) = max(unique(abs(imag(ls))));  %Swirling Strength
-
-	Q(k) = -sum(sum(A.*A'))/2;    %Q-criterion
-	R = det(A);
-	D(k) = (Q(k)/3)^3 +(R/2)^2;  %Delta-criterion
-
-	SR = (A +A')/2; %Strain rate tensor
-	OR = (A -A')/2; %Vorticity tensor
-	ls = sort(eig(SR^2 +OR^2));
-	L2(k) = ls(2);  %\lambda_2-criterion
 end
 
 L = reshape(L,S);
-Q = reshape(Q,S);
-D = reshape(D,S);
-L2 = reshape(L2,S);
 
 %% OUTPUT Formatting %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if sum(dli==dlo)~=3 %Reorders the matrices to conform to input format
@@ -212,17 +200,11 @@ if sum(dli==dlo)~=3 %Reorders the matrices to conform to input format
         cx(n) = find(dlo==dli(n));
     end
     
-    D = permute(D,cx);
-    Q = permute(Q,cx);
     L = permute(L,cx);
-    L2 = permute(L2,cx);
 end 
 
 if flag2D   %Removes erroneous data points in the instance of 2-D data
-    D = D(:,:,2);
-    Q = Q(:,:,2);
     L = L(:,:,2);
-    L2 = L2(:,:,2);
 end
 
 return

@@ -5,7 +5,7 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     BS = 24576;
     NCH = 18;
     lCH = 17; %laser signal from DET210
-    NFCH = 5:16;
+    NFCH = 6:16; %let's get rid of the first near-field microphone
     alpha = 10;
     DS = 4; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
     width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
@@ -13,13 +13,13 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     %Read PIV data first, so we know what blocks to throw out (due to bad
     %images)
     piv = load([src,filesep,piv_fid]);
+    bad_vec = piv.badvec_chk;
     fid = fopen([src,filesep,acoustic_fid],'r');
     raw = fread(fid,'float32'); 
     fclose(fid);
     raw = reshape(raw,BS,NCH,[]);
-    signal = squeeze(raw(:,lCH,piv.badvec_chk));
-    NF = raw(:,NFCH,piv.badvec_chk);
-%     NF = raw(:,6:16,piv.badvec_chk); %fix to test how important 1st microphone is
+    signal = squeeze(raw(:,lCH,bad_vec));
+    NF = raw(:,6:16,piv.badvec_chk); %fix to test how important 1st microphone is
     
     %Identify trigger indices
     trigger = diff(signal);
@@ -31,7 +31,7 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     
     %Grab relevant signal data
     Nblock = length(test);
-    xt = zeros(Nblock,(2*width+1)*length(NFCH));
+    xt = zeros(Nblock,(2*width+1)*size(NF,2));
     for n = 1:Nblock
         tmp = NF(test(n)-DS*width:DS:test(n)+DS*width,:,n);
         
@@ -57,9 +57,23 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     [nneFun, MSE, weights] = FFN_BP(xt,d,64,'amplitude',1.1);
     
     
+    fid = fopen([src,filesep,acoustic_fid],'r');
+    raw = fread(fid,'float32'); 
+    fclose(fid);
+    raw = reshape(raw,BS,NCH,[]);
+    NF = raw(:,NFCH,bad_vec);
+    NF = NF(:,:,1); %lets just use the first block...
+    np = length(NF);
+    
+    counter = 1;
+    for n = DS*width+1:DS:np-DS*width, 
+        tmp = NF(n-DS*width:DS:n+DS*width,:)/xt_norm; 
+        out(:,counter) = nneFun(tmp(:)')*d_norm; 
+        counter = counter+1;
+    end
     
 
-    for n = 1:size(out2,2)
+    for n = 1:size(out,2)
         pcolor(x,y,out2(:,:,n)); 
         shading interp; colormap jet; colorbar; caxis(clims);
         xlabel('x/D'); ylabel('y/D');
@@ -91,3 +105,14 @@ function [out] = TimeResolvedPIV(src,piv_fid,acoustic_fid)
     close(aviobj);
 
 end
+
+
+
+% %%%%%%plot 12/11 channel input results
+% for n = 1:size(out1,3)
+%     subplot(2,1,1);
+%     pcolor(x,y,out1(:,:,n)); shading interp; colormap jet; colorbar; caxis([-50 350]);
+%     subplot(2,1,2);
+%     pcolor(x,y,out2(:,:,n)); shading interp; colormap jet; colorbar; caxis([-50 350]);
+%     drawnow;
+% end
