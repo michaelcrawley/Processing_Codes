@@ -1,5 +1,5 @@
 clear;
-
+tic;
 %Constants
 downsample = 2;
 FS = 4e5;
@@ -12,11 +12,11 @@ observer.z = 8*D;
 observer.r = 2.2*D;
 
 %Load data
-% load('FFNBP_arch64_St005_UV.mat')
-% fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St005_Sync_T23.4.bin','r');
+load('FFNBP_arch64_St005_UV.mat')
+fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St005_Sync_T23.4.bin','r');
 
-load('FFNBP_St025_arch64_UV.mat')
-fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St025_Sync_T24.1.bin','r');
+% load('FFNBP_St025_arch64_UV.mat')
+% fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St025_Sync_T24.1.bin','r');
 raw = fread(fid,'float32'); 
 fclose(fid);
 raw = reshape(raw,BS,NCH,[]);
@@ -32,16 +32,21 @@ clear xt;
 
 %Find computation indices
 indx = DS*width+1:downsample:BS-width*DS;
-L = length(indx);
+L = length(indx); 
 t = (0:L-1)/(FS/downsample);
 dt = mean(diff(t));
+lafpa = lafpa(indx(1:L));
 
 %Initialize variables
-source = zeros(M,N,L);
-% p_s = source;
+lighthill = zeros(M,N,L);
+p_s = lighthill;
+% Uz = lighthill;
+% Ur = lighthill;
+% p_Uz = lighthill;
+% s_Uz = lighthill;
 
 %Compute time-resolved velocity --> solenoidal velocity --> incomp source
-counter = 0;
+parpool(12);
 parfor n = 1:L
 %     counter = counter + 1;
 %     disp(['Processing interation: ',num2str(counter),'/',num2str(L)]);
@@ -50,15 +55,17 @@ parfor n = 1:L
     tmp = tmp(:)'/xt_norm;        
     vel = nne(tmp)*d_norm;
     vel = reshape(vel,size(x,1),[]);
-    Uz = vel(:,1:size(x,2)) + Um; 
-    Ur = vel(:,size(x,2)+1:end) + Vm;
+    Uz_tmp = vel(:,1:size(x,2)) + Um; 
+    Ur_tmp = vel(:,size(x,2)+1:end) + Vm;
         
     %Compute Solenoidal velocity field
-    Uz = reshape(Uz(chk),N,[])';
-    Ur = reshape(Ur(chk),N,[])';
-    Uz = flipud(Uz);
-    Ur = flipud(Ur);    
-    [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v2(z,r,Uz,Ur);
+    Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
+    Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
+%     Uz(:,:,n) = Uz_tmp;
+%     Ur(:,:,n) = Ur_tmp;    
+    [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v2(z,r,Uz_tmp,Ur_tmp);
+%     p_Uz(:,:,n) = potential.Uz;
+%     s_Uz(:,:,n) = solenoidal.Uz;
     
     %Compute and filter source
     S = ComputeAASource(r,z,rho,solenoidal.Ur,solenoidal.Uz);
@@ -67,12 +74,21 @@ parfor n = 1:L
     S(:,1:2) = 0;
     S(:,end-1:end) = 0;
     Ssm = nanmoving_average2(S,3,3);
-    source(:,:,n) = Ssm;
+    lighthill(:,:,n) = Ssm;
     
-%     p_s(:,:,n) = Solenoidal_Pressure(z,r,rho,Uz,Ur);
+    p_s(:,:,n) = Solenoidal_Pressure(z,r,rho,Uz_tmp,Ur_tmp);
 end
+% 
+% save('Uz.mat','Uz','z','r','t','lafpa');
+% save('Ur.mat','Ur','z','r','t','lafpa');
+% save('p_Uz.mat','p_Uz','z','r','t','lafpa');
+% save('s_Uz.mat','s_Uz','z','r','t','lafpa');
+save('lighthill.mat','lighthill','z','r','t','lafpa');
+save('p_s.mat','p_s','z','r','t','lafpa');
 
-partial_t2 = mNumericalDerivative(2,2,1,L)/dt/dt;
+toc
+exit
+% partial_t2 = mNumericalDerivative(2,2,1,L)/dt/dt;
 % for m = 1:M
 %     for n = 1:N
 %         tmp = p_s(m,n,:);
@@ -81,10 +97,18 @@ partial_t2 = mNumericalDerivative(2,2,1,L)/dt/dt;
 % end
 
 
-
-%Compute observer pressure
-field.c = c;
-field.r = r;
-field.z = z;
-field.t = t;
-p = IntegrateRetardedTime(observer,field,source);
+for m = 1:M
+    for n = 1:N
+        tmp = signal(m,n,:);
+        source(m,n,:) = partial_t2*tmp(:);
+    end
+end
+% 
+% 
+% 
+% %Compute observer pressure
+% field.c = c;
+% field.r = r;
+% field.z = z;
+% field.t = t;
+% p = IntegrateRetardedTime(observer,field,lighthill);
