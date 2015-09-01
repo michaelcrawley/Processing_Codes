@@ -35,9 +35,8 @@ function p = IntegrateRetardedTime(observer,field,source)
         end
         clear source;
         
-        
         for q = tstart:length(field.t)
-            integral = trapz(trapz(retarded_source(:,:,q),1)*dr,2)*dz;
+            integral = trapz(trapz(retarded_source(:,:,q)./R,1)*dr,2)*dz;
             p{k}(q) = -integral/(4*pi*field.c*field.c);
         end
     end

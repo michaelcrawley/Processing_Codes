@@ -46,9 +46,9 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     end
     
     %Grab relevant output data
-    phi_chk = piv.data(1).Y(:,1,1) > 0;
-    U = piv.data(1).U(phi_chk,:,:);
-    V = piv.data(1).V(phi_chk,:,:);
+    phi_chk = piv.data(1).Y(1,:,1) > 0;
+    U = piv.data(1).U(:,phi_chk,:);
+    V = piv.data(1).V(:,phi_chk,:);
     
     [~,Um] = nzstats(U,3);
     [~,Vm] = nzstats(V,3);
@@ -56,8 +56,8 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     d = [reshape(U - repmat(Um,[1 1 Nblock]),[],Nblock)',reshape(V - repmat(Vm,[1 1 Nblock]),[],Nblock)'];
     
     %Free up some RAM...
-    x = piv.data(1).X;
-    y = piv.data(1).Y;
+    x = piv.data(1).X(:,phi_chk);
+    y = piv.data(1).Y(:,phi_chk);
     inputs = NF(:,:,1);
     clear trigger* piv signal raw
     
@@ -71,7 +71,7 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     [nne, mse] = FFN_BP(xt,d,arch,'amplitude',1.1,'maxepoch',8e3,'lrp',0.002);
     
     fname = ['FFNBP_arch',num2str(arch),tag,'.mat'];    
-    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','Um','Vm','x','y');
+    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','Um','Vm','x','y','src','acoustic_fid','piv_fid');
     
 %     counter = 1;
 %     for n = DS*width+1:DS:BS-width*DS

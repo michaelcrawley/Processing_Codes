@@ -23,6 +23,10 @@ function PreprocessPIV(src,wfm,reported_dt,ix,iy)
     
     %Read in all images, throw out bad ones
     [flist,~,folders] = getfiles('data.mat',src,'-a');
+    
+    keyboard;
+   
+    
     for n = 1:length(folders)
         
         %Load data
@@ -34,6 +38,7 @@ function PreprocessPIV(src,wfm,reported_dt,ix,iy)
             chk1 = (nvec/numel(data(q).X)) > 0.75;
             
             %Identify bad images based on jet core velocity averages
+            test = zeros(size(data(q).U,3),1);
             for k = 1:size(data(1).U,3)
                 tmp = data(1).U(ix,iy,k);
                 [~,test(k,1)] = nzstats(tmp(:),1);
