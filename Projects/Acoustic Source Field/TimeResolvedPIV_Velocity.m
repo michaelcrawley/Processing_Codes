@@ -1,4 +1,4 @@
-function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
+function TimeResolvedPIV_Velocity(src,piv_fid,acoustic_fid,arch,tag)
     outdir = 'Test Reconstructions';
 
     %DAQ constants
@@ -8,7 +8,7 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     lCH = 17; %laser signal from DET210
     NFCH = 5:16;
     alpha = 10;
-    DS = 4; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
+    DS = 2; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
     width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
 
     %Read PIV data first, so we know what blocks to throw out (due to bad
@@ -17,10 +17,7 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     fid = fopen([src,filesep,acoustic_fid],'r');
     raw = fread(fid,'float32'); 
     fclose(fid);
-    raw = reshape(raw,BS,NCH,[]);
-    
-    keyboard;
-    
+    raw = reshape(raw,BS,NCH,[]);    
     signal = squeeze(raw(:,lCH,piv.badvec_chk(:,1)));
     NF = raw(:,NFCH,piv.badvec_chk(:,1));
 %     NF = raw(:,6:16,piv.badvec_chk); %fix to test how important 1st microphone is
@@ -52,26 +49,31 @@ function TimeResolvedPIV(src,piv_fid,acoustic_fid,arch,tag)
     
     [~,Um] = nzstats(U,3);
     [~,Vm] = nzstats(V,3);
-%     d = [reshape(piv.data(1).U - repmat(Um,[1 1 Nblock]),[],Nblock)'];
-    d = [reshape(U - repmat(Um,[1 1 Nblock]),[],Nblock)',reshape(V - repmat(Vm,[1 1 Nblock]),[],Nblock)'];
+    
+    Ufluct = U - repmat(Um,[1 1 Nblock]);
+    Vfluct = V - repmat(Vm,[1 1 Nblock]);
+%     uf_norm = max(abs(Ufluct(:)));
+%     vf_norm = max(abs(Vfluct(:)));
+    
+    d = [reshape(Ufluct,[],Nblock)',reshape(Vfluct,[],Nblock)'];
     
     %Free up some RAM...
     x = piv.data(1).X(:,phi_chk);
     y = piv.data(1).Y(:,phi_chk);
     inputs = NF(:,:,1);
-    clear trigger* piv signal raw
+    clear trigger* piv signal raw U V NF Ufluct Vfluct
     
     %Normalize 
-    xt_norm = max(xt(:));
-    d_norm = max(d(:));
+    xt_norm = max(abs(xt(:)));
+    d_norm = max(abs(d(:)));
     xt = xt/xt_norm;
     d = d/d_norm;
     
     %ANN
-    [nne, mse] = FFN_BP(xt,d,arch,'amplitude',1.1,'maxepoch',8e3,'lrp',0.002);
+    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',1.1,'maxepoch',5e3,'lrp',0.002);
     
-    fname = ['FFNBP_arch',num2str(arch),tag,'.mat'];    
-    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','Um','Vm','x','y','src','acoustic_fid','piv_fid');
+    fname = ['FFNBP_arch',num2str(arch),tag,'UVf.mat'];    
+    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','weights');
     
 %     counter = 1;
 %     for n = DS*width+1:DS:BS-width*DS

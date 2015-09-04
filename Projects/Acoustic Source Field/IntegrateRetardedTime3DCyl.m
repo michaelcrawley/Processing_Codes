@@ -7,7 +7,7 @@ function p = IntegrateRetardedTime3DCyl(observer,field,source)
 %source variable needs to be in the form [M x N x Q]
 
     %Constants
-    Nphi = 4;
+    Nphi = 8;
     phi = linspace(0,2*pi,Nphi+1);
     dphi = mean(diff(phi));
 
@@ -20,28 +20,20 @@ function p = IntegrateRetardedTime3DCyl(observer,field,source)
     [M,N,T] = size(source);
     
     dt = abs(mean(diff(field.t)));
-    dr = mean(diff(r));
     dz = mean(diff(z));
     
     voxel = repmat(pi*(r(2:end,1).^2 - r(1:end-1,1).^2),[1 N-1 Nphi])*dz*dphi/(2*pi); %integration volume
     voxel = voxel(:);
     source = repmat(permute(source,[1 2 4 3]),[1 1 Nphi+1 1]);    
     
-    [Z,R,Phi] = meshgrid(z,r,phi);
-    Z = Z(:);
-    R = R(:);
-    Phi = Phi(:);
-    
+    [Z,R,Phi] = meshgrid(z,r,phi);    
     p = zeros(length(observer.z),T); 
-%     pool = parpool;
     for k = 1:length(observer)
         D = sqrt((observer.r(k) - R.*cos(Phi)).^2 + (R.*sin(Phi)).^2 + (observer.z(k) - Z.^2)); %propagation distance
         tau = D/field.c; %propagation delay
         itau = round(tau/dt); %for now we are simply going to round to the nearest sampled time index, rather than interpolate
-        D = reshape(D,[M N Nphi+1]);
-%         Davg = (D(1:end-1,1:end-1,1:end-1) + D(2:end,1:end-1,1:end-1) + D(1:end-1,2:end,1:end-1) + D(1:end-1,1:end-1,2:end) + D(2:end,2:end,1:end-1) + ...
-%                         D(2:end,1:end-1,2:end) + D(1:end-1,2:end,2:end) + D(2:end,2:end,2:end))/8;
         
+        itau = itau(:);
         source = reshape(source,[],T);
         for Q = 1:M*N*(Nphi+1)
             source(Q,:) = circshift(source(Q,:),[0 itau(Q)]);
@@ -61,5 +53,4 @@ function p = IntegrateRetardedTime3DCyl(observer,field,source)
             p(k,q) = -integral/(4*pi*field.c*field.c);
         end
     end
-%     delete(pool);
 end

@@ -97,14 +97,14 @@ toc
 % end
 % 
 source = zeros(M*N,L);
-signal = reshape(smoothed2,[M*N L]);
+signal = reshape(smoothed,[M*N L]);
 parfor k = 1:(M*N)
     tmp = signal(k,:);
     source(k,:) = partial_t2*tmp(:);
 end
 source = reshape(source,[M N L]);
 
-% spatial_cutout = exp(-(1e3)*(z-6*D).^4).*exp(-(1e5)*(r.^4));
+% spatial_cutout = repmat(tukeywin(N,.05).',[M 1]).*exp(-(2e5)*(r.^4));
 
 % 
 % 

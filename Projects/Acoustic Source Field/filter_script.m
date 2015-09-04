@@ -2,10 +2,10 @@
 tic;
 pool = parpool(12);
 %Preprocessing for wavelet transform
-smoothed2 = p_s;
+smoothed = p_s;
 % signal = p_s(1:128,9:520,:);
 qmf = MakeONFilter('Battle',5);
-[M,N,L] = size(smoothed2);
+[M,N,L] = size(smoothed);
 
 % %Filter in radial direction
 % signal = permute(signal,[2 3 1]);
@@ -32,7 +32,7 @@ qmf = MakeONFilter('Battle',5);
 % Smooth in spatial dimensions
 disp('Smoothing in Space');
 parfor k = 1:L
-    smoothed2(:,:,k) = moving_average2(smoothed2(:,:,k),1,2);
+    smoothed(:,:,k) = moving_average2(smoothed(:,:,k),1,2);
 end
 
 % 
@@ -65,13 +65,13 @@ end
 %Filter in temporal direction
 disp('Smoothing in Time');
 multi = 1.5;%sqrt(log(L)-1);
-smoothed2 = reshape(smoothed2,[],L);
+smoothed = reshape(smoothed,[],L);
 parfor k = 1:(M*N)    
-    tmp = smoothed2(k,:);
+    tmp = smoothed(k,:);
     filt = ThreshWave(tmp,'S',1,std(tmp),multi,2,qmf);
-    smoothed2(k,:) = filt;
+    smoothed(k,:) = filt;
 end
-smoothed2 = reshape(smoothed2,[M,N,L]);
+smoothed = reshape(smoothed,[M,N,L]);
 
 
 delete(pool);
