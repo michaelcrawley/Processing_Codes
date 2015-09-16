@@ -10,6 +10,7 @@ function TimeResolvedPIV_Velocity(src,piv_fid,acoustic_fid,arch,tag)
     alpha = 10;
     DS = 2; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
     width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
+    Nblocks = 1500;
 
     %Read PIV data first, so we know what blocks to throw out (due to bad
     %images)
@@ -17,11 +18,16 @@ function TimeResolvedPIV_Velocity(src,piv_fid,acoustic_fid,arch,tag)
     fid = fopen([src,filesep,acoustic_fid],'r');
     raw = fread(fid,'float32'); 
     fclose(fid);
-    raw = reshape(raw,BS,NCH,[]);    
-    signal = squeeze(raw(:,lCH,piv.badvec_chk(:,1)));
-    NF = raw(:,NFCH,piv.badvec_chk(:,1));
-%     NF = raw(:,6:16,piv.badvec_chk); %fix to test how important 1st microphone is
+    raw = reshape(raw,BS,NCH,[]);  
+    Nimag = size(raw,3);
+    missed_blocks = Nblocks-Nimag;
+    signal = squeeze(raw(:,lCH,piv.badvec_chk(missed_blocks+1:end,1)));
+    NF = raw(:,NFCH,piv.badvec_chk(missed_blocks+1:end,1));
     
+    %find images corresponding to missed blocks
+    cut = sum(ones(missed_blocks,1) .* piv.badvec_chk(1:missed_blocks,1));
+    piv.data(1).U = piv.data(1).U(:,:,1+cut:end);
+    piv.data(1).V = piv.data(1).V(:,:,1+cut:end);
     
 
     %Identify trigger indices

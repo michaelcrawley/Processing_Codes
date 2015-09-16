@@ -1,4 +1,4 @@
-function [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v2(z,r,Uz,Ur)
+function [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v3(z,r,Uz,Ur)
     %This function assumes that the lower boundary is the jet centerline,
     %and that the potential flow component is zero at the inlet and outlet
     %boundaries.
@@ -38,16 +38,31 @@ function [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v2(z,r,Uz,Ur)
     
     %Now we need to fix the boundary nodes...
     %Bottom - (1,:)
-    A(1:M:1+(N-1)*M,1:M:1+(N-1)*M) = spdiags(repmat(zcoefs,N,1),(-L:L)*M, N,N) + spdiags(repmat([2 -2 0]/dr/dr,N,1),(-L:L), N,N);
+%     A(1:M:1+(N-1)*M,1:M:1+(N-1)*M) = spdiags(repmat(zcoefs,N,1),(-L:L)*M, N,N) + spdiags(repmat([2 -2 0]/dr/dr,N,1),(-L:L), N,N);
+    for n = 1+M:M:1+(N-1)*M
+        A(n,n-1) = 0;
+        A(n,n+1) = 2/dr/dr;
+    end    
     %Top - (M,:)
+    A(M:M:M+(N-1)*M,:) = 0;
     A(M:M:M+(N-1)*M,M:M:M+(N-1)*M) = sparse(eye(N));
     F(M:M:M+(N-1)*M) = int_top;
     %Inflow - (:,1)
-    A((2:M-1),(2:M-1)) = sparse(eye(M-2));
-    F(2:M-1) = 0;
+    A(1,1:M+1) = sparse([-1/dr-1/dz,1/dr,zeros(1,M-2),1/dz]);
+    for n = 2:M-1
+        A(n,n-1:M+n) = [-1/2/dr,-1/dz,1/2/dr,zeros(1,M-2),1/dz];
+    end
+    A(M,M-1:2*M) = [-1/dr,-1/dr-1/dz,zeros(1,M-1),1/dz];
+    F(1:M) = 0;
     %Outflow - (:,N)
-    A(end-(2:M-1),end-(2:M-1)) = sparse(eye(M-2));
-    F((N-1)*M+2:(N-1)*M+M-1) = 0;
+    br_corner = 1+(N-1)*M;
+    tr_corner = N*M;
+    A(br_corner,br_corner-M:br_corner+1) = [-1/dz,zeros(1,M-1),1/dz-1/dr,1/dr];
+    for n = br_corner+1:tr_corner-1
+        A(n,n-M:n+1) = [-1/dz,zeros(1,M-2),-1/2/dr,1/dz,1/2/dr];
+    end
+    A(tr_corner,tr_corner-M:tr_corner) = [-1/dz,zeros(1,M-2),-1/dr,1/dr+1/dz];
+    F(end-M+1:end) = 0;
     
     %
     phi = reshape(A\F,M,N);

@@ -2,7 +2,7 @@ function [varargout] = LES_PhaseAverage(trigger,varargin)
 
     %Find length of partial forcing period at end of signal
     N = length(trigger);
-    Nfp = unique(diff(find(diff(trigger) > 0))); %number of points in forcing period
+    Nfp = mode(diff(find(diff(trigger) > 0))); %number of points in forcing period
     cut = mod(N,Nfp); %remove partial period at end of set
     nf = (N-cut)/Nfp;
     
