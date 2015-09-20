@@ -71,13 +71,13 @@ function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     clear trigger* piv signal raw U V NF Ufluct Vfluct
     
     %Normalize 
-    xt_norm = max(abs(xt),[],2);
-    d_norm = max(abs(d),[],2);
-    xt = xt/xt_norm;
-    d = d/d_norm;
+    xt_norm = max(abs(xt),[],1);
+    d_norm = max(abs(d),[],1);
+    xt = xt./repmat(xt_norm,[Nblock 1]);
+    d = d./repmat(d_norm,[Nblock 1]);
     
     %ANN
-    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',Amplitude,'maxepoch',5e3,'lrp',0.002);
+    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',Amplitude,'maxepoch',1e3,'lrp',0.002);
     
     fname = ['FFNBP_arch',num2str(arch),tag,'UVf.mat'];    
     save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','weights','Amplitude');
