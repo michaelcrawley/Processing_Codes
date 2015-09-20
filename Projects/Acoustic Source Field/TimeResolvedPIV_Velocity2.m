@@ -1,6 +1,6 @@
 function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     outdir = 'Test Reconstructions';
-
+    mkdir(outdir);
     %DAQ constants
     FS = 4e5;
     BS = 24576;
@@ -11,7 +11,7 @@ function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     DS = 2; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
     width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
     Nblocks = 1500;
-    Amplitude = 1.1;
+    Amplitude = 3;
 
     %Read PIV data first, so we know what blocks to throw out (due to bad
     %images)
@@ -61,20 +61,22 @@ function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     Vfluct = V - repmat(Vm,[1 1 Nblock]);
 %     uf_norm = max(abs(Ufluct(:)));
 %     vf_norm = max(abs(Vfluct(:)));
-    
+
+    %Normalize 
+    xt_norm = max(abs(xt),[],1);    
+    xt = xt./repmat(xt_norm,[Nblock 1]);
+    d_norm = repmat(max(abs(sqrt(mean(Ufluct.^2,3))),[],2),[1 size(U,2)]);
+    for n =1:Nblock
+        Ufluct(:,:,n) = Ufluct(:,:,n)./d_norm;
+        Vfluct(:,:,n) = Vfluct(:,:,n)./d_norm;
+    end    
     d = [reshape(Ufluct,[],Nblock)',reshape(Vfluct,[],Nblock)'];
     
     %Free up some RAM...
     x = piv.data(1).X(:,phi_chk);
     y = piv.data(1).Y(:,phi_chk);
     inputs = NF(:,:,1);
-    clear trigger* piv signal raw U V NF Ufluct Vfluct
-    
-    %Normalize 
-    xt_norm = max(abs(xt),[],1);
-    d_norm = max(abs(d),[],1);
-    xt = xt./repmat(xt_norm,[Nblock 1]);
-    d = d./repmat(d_norm,[Nblock 1]);
+%     clear trigger* piv signal raw U V NF Ufluct Vfluct
     
     %ANN
     [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',Amplitude,'maxepoch',1e3,'lrp',0.002);
