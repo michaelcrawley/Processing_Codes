@@ -12,12 +12,14 @@ observer.z = 100*D*cosd(30);
 observer.r = 100*D*sind(30);
 Nblocks = 1;
 qmf = MakeONFilter('Battle',5);
-multi = 1.5;
+multi = 2;
 
 %Pick data and output directory
-load('Test Reconstructions/FFNBP_arch512_St000UVf.mat','d_norm','DS','nne','Um','Vm','width','x','y','xt_norm','BS');
-fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_Baseline_Sync_T24.1.bin','r');
-outdir = 'St000_V1';
+[piv_file,path] = uigetfile('*.mat','Identify NNE file');
+load([path,filesep,piv_file],'d_norm','DS','nne','Um','Vm','width','x','y','xt_norm','BS');
+[acoustic_file,path] = uigetfile('*.bin','Identify Acoustic file');
+fid = fopen([path,filesep,acoustic_file],'r');
+outdir = 'St025_V1';
 mkdir(outdir);
 
 % load('FFNBP_St025_arch64_UV.mat')
@@ -44,7 +46,6 @@ field.z = z;
 field.t = t;
 
 tic;
-% parpool(12);
 for k = 1:Nblocks
     lafpa = raw(:,18,k);
     lafpa = lafpa(indx(1:L));
@@ -69,14 +70,23 @@ for k = 1:Nblocks
     end
     save([outdir,filesep,'Uz_blk',num2str(k),'.mat'],'Uz','lafpa','t','r','z');
     save([outdir,filesep,'Ur_blk',num2str(k),'.mat'],'Ur','lafpa','t','r','z');
-    clear nne;
+    
+    %Compute vortex ID
+    lambda = zeros(M,N,L);
+    parpool(8);
+    for n = 1:L
+        lambda(:,:,n) = SwirlingStrength(z,r,Uz(:,:,n),Ur(:,:,n));
+    end
+    delete(gcp);
+    save([outdir,filesep,'lambda_blk',num2str(k),'.mat'],'lambda','lafpa','t','r','z');
+    clear lambda;
     
     %Compute Solenoidal Velocity field
     disp('Computing Solenoidal Velocity Field...');
     s_Uz = zeros(M,N,L);
     s_Ur = zeros(M,N,L); 
     for n = 1:L
-        [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v3(z,r,Uz(:,:,n),Ur(:,:,n));
+        [potential,solenoidal] = Helmholtz_Decomposition2DCyl_v4(z,r,Uz(:,:,n),Ur(:,:,n));
         s_Ur(:,:,n) = solenoidal.Ur;
         s_Uz(:,:,n) = solenoidal.Uz;
     end
@@ -87,22 +97,26 @@ for k = 1:Nblocks
     %Compute PseudoPressure field
     disp('Computing Pseudo-Pressure Field...');
     ps = zeros(M,N,L);
-    parfor n = 1:L
+    for n = 1:L
         ps(:,:,n) = Solenoidal_Pressure(z,r,rho,s_Uz(:,:,n),s_Ur(:,:,n));
     end
     clear s_Uz s_Ur;
     save([outdir,filesep,'ps_blk',num2str(k),'.mat'],'ps','lafpa','t','r','z');
     
     %Smooth in time
+    disp('Smoothing...');
+    sigma = std(ps(:));
     sps = reshape(ps,M*N,L);
     clear ps;
     T = zeros(1,2^nextpow2(L));
-    for n = 1:M*N
+    parpool(8);
+    parfor n = 1:M*N
         tmp = T;
         tmp(1:L) = sps(n,:);
-        filt = ThreshWave(tmp,'S',1,std(sps(n,:)),multi,2,qmf);
+        filt = ThreshWave(tmp,'S',1,sigma,multi,2,qmf);
         sps(n,:) = filt(1:L);
     end
+    delete(gcp);
     sps = reshape(sps,[M,N,L]);
     save([outdir,filesep,'sps_blk',num2str(k),'.mat'],'sps','lafpa','t','r','z');
     
@@ -118,5 +132,4 @@ for k = 1:Nblocks
     save([outdir,filesep,'source_blk',num2str(k),'.mat'],'source','p','lafpa','t','r','z');
     clear source p sps;
 end
-% delete(gcp);
 toc
