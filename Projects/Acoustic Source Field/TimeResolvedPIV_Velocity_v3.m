@@ -1,4 +1,4 @@
-function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
+function TimeResolvedPIV_Velocity_v3(src,piv_fid,acoustic_fid,arch,tag)
     outdir = 'Test Reconstructions';
     mkdir(outdir);
     %DAQ constants
@@ -11,8 +11,7 @@ function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     DS = 2; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
     width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
     Nblocks = 1500;
-    Amplitude = 3;
-    slope = 1;
+    matversion = 4;
 
     %Read PIV data first, so we know what blocks to throw out (due to bad
     %images)
@@ -45,44 +44,42 @@ function TimeResolvedPIV_Velocity2(src,piv_fid,acoustic_fid,arch,tag)
     xt = zeros(Nblock,(2*width+1)*length(NFCH));
     for n = 1:Nblock
         tmp = NF(test(n)-DS*width:DS:test(n)+DS*width,:,n);
-        
-
         xt(n,:) = tmp(:)';
     end
     
     %Grab relevant output data
-    phi_chk = piv.data(1).Y(1,:,1) > 0;
-    U = piv.data(1).U(:,phi_chk,:);
-    V = piv.data(1).V(:,phi_chk,:);
-    
+    U = piv.data(1).U;
+    V = piv.data(1).V;    
     [~,Um] = nzstats(U,3);
     [~,Vm] = nzstats(V,3);
+    x = piv.data(1).X;
+    y = piv.data(1).Y;    
+    R = zeros(numel(x)*2,Nblock); 
+    inputs = NF(:,:,1);
+    mask = ones(size(x));
+    mask(1:30,1:85) = 0;
+    Um = Um.*mask;
+    Vm = Vm.*mask;
     
-    Ufluct = U - repmat(Um,[1 1 Nblock]);
-    Vfluct = V - repmat(Vm,[1 1 Nblock]);
-%     uf_norm = max(abs(Ufluct(:)));
-%     vf_norm = max(abs(Vfluct(:)));
+    for n = 1:Nblock
+        ut = U(:,:,n).*mask - Um;
+        vt = V(:,:,n).*mask - Vm;
+        R(:,n) = [ut(:);vt(:)];
+    end       
+    clear trigger* piv signal raw NF U V Ufluct Vfluct%Free up some RAM...
+    
+    [phi,lambda,ak] = SnapShotPOD(R,false);
 
     %Normalize 
     xt_norm = max(abs(xt(:)));
-    xt = xt/xt_norm;
-    d_norm = repmat(max(abs(sqrt(mean(Ufluct.^2,3))),[],2),[1 size(U,2)]);
-    for n =1:Nblock
-        Ufluct(:,:,n) = Ufluct(:,:,n)./d_norm;
-        Vfluct(:,:,n) = Vfluct(:,:,n)./d_norm;
-    end    
-    d = [reshape(Ufluct,[],Nblock)',reshape(Vfluct,[],Nblock)'];
-    
-    %Free up some RAM...
-    x = piv.data(1).X(:,phi_chk);
-    y = piv.data(1).Y(:,phi_chk);
-    inputs = NF(:,:,1);
-    clear trigger* piv signal raw U V NF Ufluct Vfluct
-    
+    xt = xt/xt_norm;  
+    d_norm = max(abs(ak(:)));
+    d = ak'/d_norm;
+        
     %ANN
-    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',Amplitude,'maxepoch',1e3,'lrp',0.0005);
+    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',1.05,'maxepoch',5e3,'lrp',0.1);
     
-    fname = ['FFNBP_arch',num2str(arch),tag,'UVf.mat'];    
-    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','weights','Amplitude');
+    fname = ['FFNBP_arch',num2str(arch),tag,'UVf_POD.mat'];    
+    save([outdir filesep fname],'-v7.3','nne','mse','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','weights','matversion','phi','ak');
 
 end

@@ -16,10 +16,11 @@ multi = 2;
 
 %Pick data and output directory
 [piv_file,path] = uigetfile('*.mat','Identify NNE file');
-load([path,filesep,piv_file],'d_norm','DS','nne','Um','Vm','width','x','y','xt_norm','BS');
+load([path,filesep,piv_file]);
+if ~exist('matversion','var'), matversion = 2; end
 [acoustic_file,path] = uigetfile('*.bin','Identify Acoustic file');
 fid = fopen([path,filesep,acoustic_file],'r');
-outdir = 'St005_V3';
+outdir = 'St005_V4';
 mkdir(outdir);
 
 % load('FFNBP_St025_arch64_UV.mat')
@@ -57,14 +58,26 @@ for k = 1:Nblocks
     Uz = zeros(M,N,L);
     Ur = zeros(M,N,L);
     for n = 1:L
-        tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
-        tmp = tmp(:)'/xt_norm;        
-        vel = nne(tmp);
-        vel = reshape(vel,size(x,1),[]);
-        Uz_tmp = vel(:,1:size(x,2)).*d_norm + Um; 
-        Ur_tmp = vel(:,size(x,2)+1:end).*d_norm + Vm;
-        Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
-        Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
+        switch matversion
+            case 2
+                tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
+                tmp = tmp(:)'/xt_norm;        
+                vel = nne(tmp)*d_norm;
+                vel = reshape(vel,size(x,1),[]);
+                Uz_tmp = vel(:,1:size(x,2))+ Um; 
+                Ur_tmp = vel(:,size(x,2)+1:end) + Vm;
+                Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
+                Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
+            case 3
+                tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
+                tmp = tmp(:)'/xt_norm;        
+                vel = nne(tmp);
+                vel = reshape(vel,size(x,1),[]);
+                Uz_tmp = vel(:,1:size(x,2)).*d_norm + Um; 
+                Ur_tmp = vel(:,size(x,2)+1:end).*d_norm + Vm;
+                Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
+                Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
+        end
         Uz(:,:,n) = Uz_tmp;
         Ur(:,:,n) = Ur_tmp;  
     end
