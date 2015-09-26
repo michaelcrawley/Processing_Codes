@@ -23,7 +23,7 @@ outdir = 'St005_V3';
 mkdir(outdir);
 
 % load('FFNBP_St025_arch64_UV.mat')
-% fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St025_Sync_T24.1.bin','r');
+fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St025_Sync_T24.1.bin','r');
 raw = fread(fid,'float32'); 
 fclose(fid);
 raw = reshape(raw,BS,NCH,[]);

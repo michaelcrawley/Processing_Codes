@@ -20,19 +20,18 @@ load([path,filesep,piv_file]);
 if ~exist('matversion','var'), matversion = 2; end
 [acoustic_file,path] = uigetfile('*.bin','Identify Acoustic file');
 fid = fopen([path,filesep,acoustic_file],'r');
-outdir = 'St005_V4';
+outdir = 'St005_V5';
 mkdir(outdir);
 
-% load('FFNBP_St025_arch64_UV.mat')
-% fid = fopen('/mnt/Samimy_research/ACTIVE_DATA/Jet/Mach09/20150711/Acoustic/M09_St025_Sync_T24.1.bin','r');
 raw = fread(fid,'float32'); 
 fclose(fid);
 raw = reshape(raw,BS,NCH,[]);
 raw = raw(:,:,1:Nblocks);
-chk = y>0;
-r = reshape(y(chk),size(x,1),[])'/1000;
-z = reshape(x(chk),size(x,1),[])'/1000;
-r = flipud(r);
+chk = y(1,:)>0;
+r = y(:,chk)'/1000;
+z = x(:,chk)'/1000;
+[~,isort] = sort(r(:,1));
+r = r(isort,:);
 [M,N] = size(z);
 
 %Find computation indices
@@ -58,33 +57,38 @@ for k = 1:Nblocks
     Uz = zeros(M,N,L);
     Ur = zeros(M,N,L);
     for n = 1:L
+        tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
+        tmp = tmp(:)'/xt_norm;      
         switch matversion
-            case 2
-                tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
-                tmp = tmp(:)'/xt_norm;        
+            case 2  
                 vel = nne(tmp)*d_norm;
                 vel = reshape(vel,size(x,1),[]);
                 Uz_tmp = vel(:,1:size(x,2))+ Um; 
                 Ur_tmp = vel(:,size(x,2)+1:end) + Vm;
-                Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
-                Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
-            case 3
-                tmp = inputs(indx(n)-DS*width:DS:indx(n)+DS*width,:);
-                tmp = tmp(:)'/xt_norm;        
+            case 3       
                 vel = nne(tmp);
                 vel = reshape(vel,size(x,1),[]);
                 Uz_tmp = vel(:,1:size(x,2)).*d_norm + Um; 
                 Ur_tmp = vel(:,size(x,2)+1:end).*d_norm + Vm;
-                Uz_tmp = flipud(reshape(Uz_tmp(chk),N,[])');
-                Ur_tmp = flipud(reshape(Ur_tmp(chk),N,[])');
+            case 4
+                ak = (nne(tmp).')*d_norm;
+                vel = phi*ak;
+                Uz_tmp = reshape(vel(1:numel(x)),size(x)) + Um;
+                Ur_tmp = reshape(vel(numel(x)+1:end),size(x)) + Vm;    
         end
+        Uz_tmp = Uz_tmp(:,chk)';
+        Ur_tmp = Ur_tmp(:,chk)';
+        Uz_tmp = Uz_tmp(isort,:);
+        Ur_tmp = Ur_tmp(isort,:);
         Uz(:,:,n) = Uz_tmp;
         Ur(:,:,n) = Ur_tmp;  
     end
+    clear phi;
     save([outdir,filesep,'Uz_blk',num2str(k),'.mat'],'Uz','lafpa','t','r','z');
     save([outdir,filesep,'Ur_blk',num2str(k),'.mat'],'Ur','lafpa','t','r','z');
     
-%     %Compute vortex ID
+    %Compute vortex ID
+%     disp('Computing Vortex Identification...');
 %     lambda = zeros(M,N,L);
 %     parpool(8);
 %     for n = 1:L
