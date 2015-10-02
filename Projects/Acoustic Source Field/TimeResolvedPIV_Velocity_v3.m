@@ -8,10 +8,11 @@ function TimeResolvedPIV_Velocity_v3(src,piv_fid,acoustic_fid,arch,tag,mask)
     lCH = 17; %laser signal from DET210
     NFCH = 5:16;
     alpha = 10;
-    DS = 1; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
-    width = 1024; %number of points (after downsample) on either side of the laser trigger for correlation
+    DS = 2; %the microphones are low-pass filtered at FS/4, so there is no reason to keep all of that data
+    width = 512; %number of points (after downsample) on either side of the laser trigger for correlation
     Nblocks = 1500;
     matversion = 4;
+    nmodes = 1000;
     if ~exist('mask','var'), mask = 1; end
 
     %Read PIV data first, so we know what blocks to throw out (due to bad
@@ -68,6 +69,8 @@ function TimeResolvedPIV_Velocity_v3(src,piv_fid,acoustic_fid,arch,tag,mask)
     clear trigger* piv signal raw NF U V Ufluct Vfluct%Free up some RAM...
     
     [phi,lambda,ak] = SnapShotPOD(R,false);
+    phi = phi(:,1:nmodes);
+    ak = ak(1:nmodes,:);
 
     %Normalize 
     xt_norm = max(abs(xt(:)));
@@ -77,11 +80,11 @@ function TimeResolvedPIV_Velocity_v3(src,piv_fid,acoustic_fid,arch,tag,mask)
         
     %Save unnecessary outputs before iterating
     fname = ['FFNBP_arch',num2str(arch),tag,'UVf_POD.mat'];    
-    save([outdir filesep fname],'-v7.3','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','matversion','phi','ak','lambda');
+    save([outdir filesep fname],'-v7.3','BS','DS','width','d_norm','xt_norm','d','xt','inputs','arch','Um','Vm','x','y','src','acoustic_fid','piv_fid','matversion','phi','ak','lambda','nmodes');
     clear BS DS width d_norm xt_norm inputs Um Vm x y phi ak lambda R;
     
     %ANN
-    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',1.05,'maxepoch',5e4,'lrp',0.02);    
+    [nne, mse, weights] = FFN_BP(xt,d,arch,'amplitude',1.05,'maxepoch',1e4,'lrp',0.02);    
     save([outdir filesep fname],'-append','nne','mse','weights');
 
 end

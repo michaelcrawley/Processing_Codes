@@ -20,7 +20,7 @@ load([path,filesep,piv_file]);
 if ~exist('matversion','var'), matversion = 2; end
 [acoustic_file,path] = uigetfile('*.bin','Identify Acoustic file');
 fid = fopen([path,filesep,acoustic_file],'r');
-outdir = 'St005_V5';
+outdir = 'St005_FINAL';
 mkdir(outdir);
 
 raw = fread(fid,'float32'); 
@@ -36,7 +36,8 @@ r = r(isort,:);
 
 %Find computation indices
 indx = DS*width+1:downsample:BS-width*DS;
-L = length(indx); 
+% L = floor(length(indx)/4); %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  For testing purposes, lets just use the first 4th of the block
+L = length(indx);
 t = (0:L-1)/(FS/downsample);
 dt = mean(diff(t));
 partial_t2 = mNumericalDerivative(2,2,1,L)/dt/dt;
@@ -72,7 +73,7 @@ for k = 1:Nblocks
                 Ur_tmp = vel(:,size(x,2)+1:end).*d_norm + Vm;
             case 4
                 ak = (nne(tmp).')*d_norm;
-                vel = phi*ak;
+                vel = phi(:,1:nmodes)*ak;
                 Uz_tmp = reshape(vel(1:numel(x)),size(x)) + Um;
                 Ur_tmp = reshape(vel(numel(x)+1:end),size(x)) + Vm;    
         end
@@ -88,15 +89,17 @@ for k = 1:Nblocks
     save([outdir,filesep,'Ur_blk',num2str(k),'.mat'],'Ur','lafpa','t','r','z');
     
     %Compute vortex ID
-%     disp('Computing Vortex Identification...');
-%     lambda = zeros(M,N,L);
-%     parpool(8);
-%     for n = 1:L
-%         lambda(:,:,n) = SwirlingStrength(z,r,Uz(:,:,n),Ur(:,:,n));
-%     end
-%     delete(gcp);
-%     save([outdir,filesep,'lambda_blk',num2str(k),'.mat'],'lambda','lafpa','t','r','z');
-%     clear lambda;
+    disp('Computing Vortex Identification...');
+    lambda = zeros(M,N,L);
+    parpool(8);
+    for n = 1:L
+        Uzsm = moving_average2(Uz(:,:,n),1);
+        Ursm = moving_average2(Ur(:,:,n),1);
+        lambda(:,:,n) = SwirlingStrength(z,r,Uzsm,Ursm);
+    end
+    delete(gcp);
+    save([outdir,filesep,'lambda_blk',num2str(k),'.mat'],'lambda','lafpa','t','r','z');
+    clear lambda;
     
     %Compute Solenoidal Velocity field
     disp('Computing Solenoidal Velocity Field...');

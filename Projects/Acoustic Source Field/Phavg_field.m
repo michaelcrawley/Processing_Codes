@@ -1,6 +1,6 @@
 function [varargout] = Phavg_field(lafpa,varargin)
 
-    indx = [find(diff(lafpa)>2.25); length(lafpa)];
+    indx = [find(diff(lafpa)>2.25)+1; length(lafpa)];
     L = max(diff(indx));
     
     varargout = cell(length(varargin),1);
