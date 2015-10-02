@@ -1,3 +1,5 @@
 *.asv
 *.mat
 *Tinney*
+*.fig
+*.png
