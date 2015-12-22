@@ -36,7 +36,7 @@ function Process_AoAS_Sweep(src,params)
     end
     
     %%% Process constant parameters
-    rho = params.P_inf/((params.Temp+273.15)*287.05);          %Calculated Gas Constant 
+    rho = params.P_inf/(params.Temp*287.05);          %Calculated Gas Constant 
     Q = 0.5 * rho * params.Velocity^2;                           %Calculated Dynamic Pressure
     AoSB = params.AoSB*pi/180;                         %convert Sideslip of Balance from flow to radians
     AoSM = (params.AoSB + params.AoSM)*pi/180;      %Sideslip of Model from flow
@@ -153,15 +153,15 @@ function [cal,f_indx,T_indx] = Calibration(loadcell)
             cal = importdata('JR3_CalibrationMatrix.txt');
             f_indx = @(x) x(:,[3,2,1]).*repmat([-1 1 -1],size(x,1),1);
             T_indx = @(x) x(:,[6,5,4]).*repmat([-1 1 1],size(x,1),1);
-        case 'jr3_load_cell_fz_up'
+        case 'jr3_fz_up'
             cal = importdata('JR3_CalibrationMatrix.txt');
             f_indx = @(x) x(:,[1,2,3]).*repmat([1 -1 1],size(x,1),1);
             T_indx = @(x) x(:,[4,5,6]).*repmat([1 -1 1],size(x,1),1);
-        case 'ati_n25_load_cell_fz_up'
+        case 'ati_n25_fz_up'
             cal = importdata('ATI_N25_FT14574.txt');
             f_indx = @(x) x(:,[1,2,3]);
             T_indx = @(x) x(:,[4,5,6]);
-        case 'ati_n25_load_cell_fz_down'
+        case 'ati_n25_fz_down'
             cal = importdata('ATI_N25_FT14574.txt');
             f_indx = @(x) x(:,[1,2,3]).*repmat([1 -1 -1],size(x,1),1);
             T_indx = @(x) x(:,[4,5,6]).*repmat([1 -1 -1],size(x,1),1);
