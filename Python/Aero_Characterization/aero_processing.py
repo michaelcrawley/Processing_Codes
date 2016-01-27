@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec 18 14:08:19 2015
-
 @author: michaelcrawley
 """
 
@@ -21,8 +19,8 @@ class model_params():
         self.span = span
         self.velocity = Velocity
         self.loadcell = loadcell
-        self.P_inf = 0  #we'll get this info later
-        self.Temp = 0   #we'll get this info later
+        self.P_inf = None  #we'll get this info later
+        self.Temp = None   #we'll get this info later
         self.Xmrp = Xmrp
         self.Ymrp = Ymrp
         self.Zmrp = Zmrp
@@ -38,6 +36,9 @@ class model_params():
         self.delAoS = (AoSM - AoSB)*np.pi/180
         self.delRoll = self.RollB + self.RollM
         self.delAoA = AoAM * np.pi / 180
+
+class data_struct(): #because python is idiotic, this class definition is needed in order to make dynamic structures
+    pass
 
 def get_dim(nparray,dim):
     size = nparray.shape
@@ -90,29 +91,6 @@ def Calibration(loadcell):
     cal = np.loadtxt(fname)
     return cal, f_indx, m_indx
 
-def process_tare(fname,cal):
-    voltage = pd.read_csv(fname,sep='\t',comment='R')
-    loads = np.dot(voltage,cal)
-    return np.mean(loads,axis=0)
-
-def process_data(fname,cal,AoA,tare_means,tare_AoA,params):
-
-    #Load data
-    voltage = pd.read_csv(fname,sep='\t',comment='R')
-    loads = np.dot(voltage,cal)
-    raw_mean = np.mean(loads,axis=0)
-    raw_std = np.std(loads,axis=0)
-
-    #Correct for wind-off tares
-    int_tare = interp_extrap(tare_AoA,AoA,tare_means)
-    corrected = loads - np.tile(int_tare,(loads.shape[0],1))
-    corrected_mean = np.mean(corrected,axis=0)
-
-    #Calculate rotation matrices
-    AoAB = (AoA + params.AoAB)*np.pi/180
-    AoAM = (AoA + params.AoAB + params.AoAM)*np.pi/180
-
-
 def aero_processing(src,params):
 
     #Constant parameters
@@ -130,10 +108,14 @@ def aero_processing(src,params):
     #Find all tare and data files
     tare_files = glob(os.path.join(src,'Tare','*Raw.wtd'))
     data_files = glob(os.path.join(src,'*Raw.wtd'))
+    version = 8;
+    if len(data_files) == 0 # either we have no data, or it is in binary files
+        tare_files = glob(os.path.join(src,'*.tare'))
+        data_files = glob(os.path.join(src,'*.raw'))
+        version = 9
 
-    #Sort and Process Tare data
+    ####Sort and Process Tare data
     num_tare = len(tare_files)      #number of tare files
-    #num_cpu_tare = min((num_tare,mp.cpu_count()))         #number of cores to use when processing tare files
     tare_AoA = np.zeros((num_tare))
     for k in range(num_tare):
         tare_AoA[k] = get_AoX(tare_files[k])[0]
@@ -142,15 +124,56 @@ def aero_processing(src,params):
     tare_AoA = tare_AoA[tare_indx]
     tare_files = [tare_files[k] for k in tare_indx]     #because python is total bullshit when it comes to lists...
     tare_means = np.zeros((num_tare,6)) #output of the load cells is always of DIM 6
-    for k in range(len(tare_files)):
-        tare_means[k,:] = process_tare(tare_files[k],cal)
+    for k in range(num_tare):
+        if version == 8
+            voltage = pd.read_csv(tare_files[k],sep='\t',comment='R')
+        elif version == 9
+            fid = open(tare_files[k],'rb')
+            tmp = np.fromfile(fid,dtype='<f')
+            voltage = np.reshape(tmp,(len(tmp)/6,6),'C')
+            fid.close()
+        loads = np.dot(cal,voltage.T).T
+        tare_means[k,:] = np.mean(loads,axis=0)
 
 
-    #Sort and Process Aero data
+    ####Sort and Process Aero data
     num_data = len(data_files)
     data_AoA = np.zeros((num_data))
+    for k in range(num_data):
+        data_AoA[k] = get_AoX(data_files[k])[0]
+
     data_indx = np.argsort(data_AoA,axis=0)
     data_AoA = data_AoA[data_indx]
     data_files = [data_files[k] for k in data_indx]
+    for k in range(num_data)
+        #Calculate rotation matrices
+        AoAB = (AoA[k] + params.AoAB)*np.pi/180
+        AoAM = (AoA[k] + params.AoAB + params.AoAM)*np.pi/180
+        delAoA = AoAM-AoAB;    #Angle difference from y axis
+        aircraft_body_rot = np.dot(np.dot(Rot3(delRoll),Rot2(delAoA)),Rot1(delAoS))
+        stability_rot = np.dot(Rot1(AoSM),Rot2(AoAM))
+        rotation = np.dot(stability_rot,aircraft_body_rot)
 
-    return tare_means
+        #Load data
+        if version == 8
+            voltage = pd.read_csv(data_files[k],sep='\t',comment='R')
+        elif version == 9
+            fid = open(data_files[k],'rb')
+            tmp = np.fromfile(fid,dtype='<f')
+            voltage = np.reshape(tmp,(len(tmp)/6,6),'C')
+            fid.close()
+        loads = np.dot(cal,voltage.T).T
+        raw_mean = np.mean(loads,axis=0)
+        raw_std = np.std(loads,axis=0)
+
+        #Correct for wind-off tares
+        int_tare = interp_extrap(tare_AoA,AoA,tare_means)
+        corrected = loads - np.tile(int_tare,(loads.shape[0],1))
+        corrected_mean = np.mean(corrected,axis=0)
+
+        #convert to aero axis
+        forces = np.dot(rotation,f_indx(corrected).T)
+        moment = np.dot(rotation,m_indx(correct).T)
+        MRP = np.dot(rotation,np.array([params.Xmrp,params.Ymrp,params.Zmrp]).T)
+
+    return 0

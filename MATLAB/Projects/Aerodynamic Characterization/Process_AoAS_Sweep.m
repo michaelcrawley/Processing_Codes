@@ -56,7 +56,7 @@ function aero = Process_AoAS_Sweep(src,params)
     if ~isfield(params,'AoSM'), params.AoSM = 0; end
     if ~isfield(params,'AoRB'), params.AoRB = 0; end
     if ~isfield(params,'AoRM'), params.AoRM = 0; end
-    
+
     %Constants
     Rot1 = @(angle) [cos(angle) sin(angle) 0;  -sin(angle) cos(angle) 0; 0 0 1];
     Rot2 = @(angle) [cos(angle) 0 sin(angle) ; 0 1 0 ; -sin(angle) 0 cos(angle)];
@@ -64,7 +64,7 @@ function aero = Process_AoAS_Sweep(src,params)
 
     %%% Get Calibration Data
     [cal,f_indx,T_indx] = Calibration(params.loadcell);
-    
+
     %%% Find Data and Tare files (and figure out versioning)
     tare_files = getfiles('*.tare',src);
     num_tares = length(tare_files);
@@ -83,7 +83,7 @@ function aero = Process_AoAS_Sweep(src,params)
     if num_tares ~= num_data
         error('Mismatch between number of tares and number of data files!')
     end
-    
+
     %%% Get tunnel conditions
     tmp = regexp(data_files{1},'_','split');
     mainfname = tmp{1};
@@ -99,9 +99,9 @@ function aero = Process_AoAS_Sweep(src,params)
     tmp = fscanf(fid,'%f');
     params.Temp = tmp(3);
     fclose(fid);
-    
+
     %%% Process constant parameters
-    rho = params.P_inf/(params.Temp*287.05);          %Calculated Gas Constant 
+    rho = params.P_inf/(params.Temp*287.05);          %Calculated Gas Constant
     Q = 0.5 * rho * params.Velocity^2;                           %Calculated Dynamic Pressure
     AoSB = params.AoSB*pi/180;                         %convert Sideslip of Balance from flow to radians
     AoSM = (params.AoSB + params.AoSM)*pi/180;      %Sideslip of Model from flow
@@ -110,7 +110,7 @@ function aero = Process_AoAS_Sweep(src,params)
 
     delAoS = AoSM-AoSB;    %Angle difference from X axis
     delRoll = RollM-RollB; %Angle difference from z axis
-    
+
     %%% Process Wind-Off Tares
     tare(1:num_tares) = struct();
     for n = 1:num_tares
@@ -118,7 +118,7 @@ function aero = Process_AoAS_Sweep(src,params)
         angles = regexp(tare_files{n},'_AoA(?<AoA>[0-9.-]+)+_AoS(?<AoS>[0-9.-]+)','names');
         tare(n).AoA = str2double(angles.AoA);
         tare(n).AoS = str2double(angles.AoS);
-        
+
         %Read voltages & convert to mean load
         fid = fopen([tare_dir,filesep,tare_files{n}]);
         if version == 8
@@ -128,13 +128,13 @@ function aero = Process_AoAS_Sweep(src,params)
             tmp = fread(fid,'float32');
             voltage = reshape(tmp,[],6)';
         end
-        fclose(fid);        
-        tare(n).means = mean((cal*voltage)',1);        
+        fclose(fid);
+        tare(n).means = mean((cal*voltage)',1);
     end
     %sort by increasing angle of attack
-    [~,indx] = sort([tare.AoA]); 
+    [~,indx] = sort([tare.AoA]);
     tare = tare(indx);
-    
+
     %%% Process Loads Data
     aero(1:num_data) = struct();
     for n = 1:num_data
@@ -142,7 +142,7 @@ function aero = Process_AoAS_Sweep(src,params)
         angles = regexp(data_files{n},'_AoA(?<AoA>[0-9.-]+)+_AoS(?<AoS>[0-9.-]+)','names');
         aero(n).AoA = str2double(angles.AoA);
         aero(n).AoS = str2double(angles.AoS);
-        
+
         %Read raw voltages & convert to force/torque
         fid = fopen([src,filesep,data_files{n}]);
         if version == 8
@@ -156,26 +156,26 @@ function aero = Process_AoAS_Sweep(src,params)
         loads = (cal*voltage)';
         raw.mean = mean(loads,1);
         raw.std = std(loads,[],1);
-        
+
         %Interp between AoA's in tares
         int_tare = interp1([tare.AoA],reshape([tare.means],6,num_tares)',aero(n).AoA,'linear','extrap');
         raw.corrected = loads - repmat(int_tare,size(loads,1),1);
         raw.corrected_mean = mean(raw.corrected,1);
-        
+
         %Calculate Rotation Matrices
         AoAB = (aero(n).AoA+params.AoAB)*pi/180;                %AoA offset of balance from inclinometer
         AoAM = (aero(n).AoA+params.AoAB+params.AoAM)*pi/180;   %AoA offset of model from balance
         delAoA = AoAM-AoAB;    %Angle difference from y axis
         aircraft_body_rot = Rot3(delRoll)*Rot2(delAoA)*Rot1(delAoS);
         stability_rot = Rot1(AoSM) * Rot2(AoAM);
-        
+
         %Convert axes on f/T
         forces = f_indx(raw.corrected)';
         moments = T_indx(raw.corrected)';
         forces = stability_rot*aircraft_body_rot*forces;
         moments = stability_rot*aircraft_body_rot*moments;
         MRP = stability_rot*aircraft_body_rot*[params.Xmrp ; params.Ymrp ; params.Zmrp];
-        
+
         D = forces(1,:)';
         S = forces(2,:)';
         L = forces(3,:)';
@@ -185,7 +185,7 @@ function aero = Process_AoAS_Sweep(src,params)
         XP = MRP(1);
         YP = MRP(2);
         ZP = MRP(3);
-        
+
         %Calculate Aerodynamic coefficients
         RM = RMT+L*YP-S*ZP;
         PM = PMT-L*XP-D*ZP;
@@ -198,14 +198,14 @@ function aero = Process_AoAS_Sweep(src,params)
         CRM = RM/Q/params.Area/params.span;
         CPM = PM/Q/params.Area/params.Chord;
         CYM = YM/Q/params.Area/params.span;
-        
+
         aero(n).CL = mean(CL);
         aero(n).CD = mean(CD);
         aero(n).CS = mean(CS);
         aero(n).CRM = mean(CRM);
         aero(n).CPM = mean(CPM);
         aero(n).CYM = mean(CYM);
-        
+
         aero(n).CLstd = std(CL);
         aero(n).CDstd = std(CD);
         aero(n).CSstd = std(CS);
@@ -214,7 +214,7 @@ function aero = Process_AoAS_Sweep(src,params)
         aero(n).CYMstd = std(CYM);
     end
     %sort by increasing angle of attack
-    [~,indx] = sort([aero.AoA]); 
+    [~,indx] = sort([aero.AoA]);
     aero = aero(indx);
 
     processing_file = [mfilename '.m']; %#ok<NASGU>
@@ -233,11 +233,7 @@ function Save_TXT(src,params,aero)
     fprintf(fid,'AoA\tCL\tCD\tCS\tCRM\tCPM\tCYM\tSD(CL)\tSD(CD)\tSD(CS)\tSD(CRM)\tSD(CPM)\tSD(CYM)');
 
     for n = 1:length(aero)
-        fprintf(fid,'\n');
-        %fprintf(fid,'%s\n',[num2str(LoadData.AoA(i)) ' ' num2str(LoadData.AeroCoefficients(i,1)) ' ' num2str(LoadData.AeroCoefficients(i,2)) ' ' num2str(LoadData.AeroCoefficients(i,3)) ' ' num2str(LoadData.AeroCoefficients(i,4)) ' ' num2str(LoadData.AeroCoefficients(i,5)) ' ' num2str(LoadData.AeroCoefficients(i,6)) ...
-        %    ' ' num2str(LoadData.AeroCoefficientsSD(i,1)) ' ' num2str(LoadData.AeroCoefficientsSD(i,2)) ' ' num2str(LoadData.AeroCoefficientsSD(i,3)) ' ' num2str(LoadData.AeroCoefficientsSD(i,4)) ' ' num2str(LoadData.AeroCoefficientsSD(i,5)) ' ' num2str(LoadData.AeroCoefficientsSD(i,6)) ...
-        %    ]);
-        
+        fprintf(fid,'\n');  
         fprintf(fid,num2str([aero(n).AoA,aero(n).CL,aero(n).CD,aero(n).CS,aero(n).CRM,aero(n).CPM,aero(n).CYM,aero(n).CLstd,aero(n).CDstd,aero(n).CSstd,aero(n).CRMstd,aero(n).CPMstd,aero(n).CYMstd]));
 
     end
@@ -248,7 +244,7 @@ end
 
 function [cal,f_indx,T_indx] = Calibration(loadcell)
     switch lower(loadcell)
-        case 'jr3_fz_down' 
+        case 'jr3_fz_down'
             cal = importdata('JR3_CalibrationMatrix.txt');
             f_indx = @(x) x(:,[3,2,1]).*repmat([-1 1 -1],size(x,1),1);
             T_indx = @(x) x(:,[6,5,4]).*repmat([-1 1 1],size(x,1),1);
@@ -274,36 +270,36 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
 %Function returns list of files and folders (and source directory) based on
 %a given condition.
 %Inputs:
-%           condition:  conditional string on which returned files are 
-%                       dependent.  Accepts wildcards.  [] returns all 
+%           condition:  conditional string on which returned files are
+%                       dependent.  Accepts wildcards.  [] returns all
 %                       files in directory.
 %           options:
 %                       path:   specify top-level directory for searching.
-%                               If this is not specified, the program 
+%                               If this is not specified, the program
 %                               prompts the user.
 %                       '-a' or '-all': searches subdirectories in addition
 %                                       to top-level.
 %                       '-s' or '-sub': allows user to select a subset of
 %                                       the found files.
 
-    if ~exist('condition','var'), condition = ''; end 
+    if ~exist('condition','var'), condition = ''; end
     if isempty(varargin), varargin = {''}; end
-    
+
     %Determine search directory
     test = cellfun(@(lst) isdir(lst),varargin);
     if any(test)
         src_dir = varargin{test};
     else
-        src_dir = uigetdir('Specify Directory'); 
+        src_dir = uigetdir('Specify Directory');
     end
-    
+
     %find files within directory that match given condition
     flist = findfiles(src_dir,condition);
-    
+
     %find folders and contents within
     cutoff = length(src_dir)+2; %cutoff for folder name
-    if any(strcmpi(varargin,'-all')) || any(strcmpi(varargin,'-a'))        
-        tmp = genpath(src_dir);        
+    if any(strcmpi(varargin,'-all')) || any(strcmpi(varargin,'-a'))
+        tmp = genpath(src_dir);
         folders = regexp(tmp,pathsep,'split'); %find subdirs
         folders = folders(2:end); %remove top level directory from subdir list
         folder_keep = true(1,length(folders)); %logical check for folder contents
@@ -312,7 +308,7 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
            if ~isempty(tflist)
                tflist = cellfun(@(file) fullfile(folders{n}(cutoff:end),file),tflist,'UniformOutput',false); %append subdir name to file
                flist = [flist, tflist]; %append new subdir filelist to dir filelist
-           else 
+           else
                folder_keep(n) = false;
            end
         end
@@ -320,9 +316,9 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
     else
         folders = cell(0);
     end
-    
+
     %Lets user choose the subset of files in that directory for gathering
-    if any(strcmpi(varargin,'-sub')) || any(strcmpi(varargin,'-s')) 
+    if any(strcmpi(varargin,'-sub')) || any(strcmpi(varargin,'-s'))
         l = max(cellfun(@length,flist));
         [keep,ok] = listdlg('PromptString','Select Desired Files','SelectionMode','multiple','ListSize',[8*l 300],'ListString',flist);
         if ok==0
@@ -331,7 +327,7 @@ function [flist,src_dir,folders] = getfiles(condition,varargin)
         flist = flist(keep);
     end
     flist = flist';
-    
+
     %If user is requesting folders, output file list should be changed
     if nargout > 2
         for n = 1:length(folders)

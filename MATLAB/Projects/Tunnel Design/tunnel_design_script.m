@@ -3,9 +3,9 @@ clear;
 
 %Variables
 M = 2.5;
-A_test = (5*0.0254)^2;
-V = 20;
-p_i = 175*6894.76;
+A_test = (6*0.0254)^2;
+V = 19; %cubic meters
+p_i = 215*6894.76;
 
 %Constants
 R = 287;
