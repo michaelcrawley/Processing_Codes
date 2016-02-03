@@ -6,18 +6,18 @@
 ###Import modules
 import os
 import re
+import time
 import numpy as np
 import pandas as pd
 from glob import glob
-from datetime import datetime
 
 ###Class and function definitions
-class model_params():
-    def __init__(self,Velocity,area,chord,span,loadcell,Xmrp=0,Ymrp=0,Zmrp=0,AoAB=0,AoAM=0,AoSB=0,AoSM=0,AoRB=0,AoRM=0):
+class model_params:
+    def __init__(self,velocity,area,chord,span,loadcell,Xmrp=0,Ymrp=0,Zmrp=0,AoAB=0,AoAM=0,AoSB=0,AoSM=0,AoRB=0,AoRM=0):
         self.area = area
         self.chord = chord
         self.span = span
-        self.velocity = Velocity
+        self.velocity = velocity
         self.loadcell = loadcell
         self.P_inf = None  #we'll get this info later
         self.Temp = None   #we'll get this info later
@@ -37,8 +37,20 @@ class model_params():
         self.delRoll = self.RollB + self.RollM
         self.delAoA = AoAM * np.pi / 180
 
-class data_struct(): #because python is idiotic, this class definition is needed in order to make dynamic structures
-    pass
+class data_struct:
+    def __init__(self,CL,CD,CS,CRM,CPM,CYM):
+        self.CL = np.mean(CL,axis=0)
+        self.CD = np.mean(CD,axis=0)
+        self.CS = np.mean(CS,axis=0)
+        self.CRM = np.mean(CRM,axis=0)
+        self.CPM = np.mean(CPM,axis=0)
+        self.CYM = np.mean(CYM,axis=0)
+        self.CLstd = np.std(CL,axis=0)
+        self.CDstd = np.std(CD,axis=0)
+        self.CSstd = np.std(CS,axis=0)
+        self.CRMstd = np.std(CRM,axis=0)
+        self.CPMstd = np.std(CPM,axis=0)
+        self.CYMstd = np.std(CYM,axis=0)
 
 def get_dim(nparray,dim):
     size = nparray.shape
@@ -91,6 +103,41 @@ def Calibration(loadcell):
     cal = np.loadtxt(fname)
     return cal, f_indx, m_indx
 
+def Save_TXT(src,params,aero):
+    fname = os.path.join(src,'Results.txt')
+    with open(fname,'w') as fid:
+        fid.write('Ref_Area[m2]\tRef_Chord_Length[m]\tRef_Span_b[m]\tXc[m]\tYc[m]\tZc[m]\tBalance_AoA_Offset[deg]\tModel_AoA_Offset[deg]\tBalance_Side_Slip_Offset[deg]\tModel_Side_Slip_Slip_Offset[deg]\tBalance_Roll_Offset[deg]\tModel_Roll_Offset[deg]\n')
+        params_str = str(params.Area)
+        params_str += '\t' + str(params.Chord)
+        params_str += '\t' + str(params.span)
+        params_str += '\t' + str(params.Xmrp)
+        params_str += '\t' + str(params.Yrmp)
+        params_str += '\t' + str(params.Zmrp)
+        params_str += '\t' + str(params.AoAB)
+        params_str += '\t' + str(params.AoAM)
+        params_str += '\t' + str(params.AoSB)
+        params_str += '\t' + str(params.AoSM)
+        params_str += '\t' + str(params.AoRB)
+        params_str += '\t' + str(params.AoRM)
+        fid.write(params_str)
+        fid.write('AoA\tCL\tCD\tCS\tCRM\tCPM\tCYM\tSD(CL)\tSD(CD)\tSD(CS)\tSD(CRM)\tSD(CPM)\tSD(CYM)')
+
+        for k in range(len(aero)):
+            data_str = str(aero(k).AoA)
+            data_str += '\t' + str(aero(k).CL)
+            data_str += '\t' + str(aero(k).CD)
+            data_str += '\t' + str(aero(k).CS)
+            data_str += '\t' + str(aero(k).CRM)
+            data_str += '\t' + str(aero(k).CPM)
+            data_str += '\t' + str(aero(k).CYM)
+            data_str += '\t' + str(aero(k).CLstd)
+            data_str += '\t' + str(aero(k).CDstd)
+            data_str += '\t' + str(aero(k).CSstd)
+            data_str += '\t' + str(aero(k).CRMstd)
+            data_str += '\t' + str(aero(k).CPMstd)
+            data_str += '\t' + str(aero(k).CYMstd)
+            fid.write(data_str + '\n')
+
 def aero_processing(src,params):
 
     #Constant parameters
@@ -109,7 +156,7 @@ def aero_processing(src,params):
     tare_files = glob(os.path.join(src,'Tare','*Raw.wtd'))
     data_files = glob(os.path.join(src,'*Raw.wtd'))
     version = 8;
-    if len(data_files) == 0 # either we have no data, or it is in binary files
+    if len(data_files) == 0: # either we have no data, or it is in binary files
         tare_files = glob(os.path.join(src,'*.tare'))
         data_files = glob(os.path.join(src,'*.raw'))
         version = 9
@@ -125,9 +172,9 @@ def aero_processing(src,params):
     tare_files = [tare_files[k] for k in tare_indx]     #because python is total bullshit when it comes to lists...
     tare_means = np.zeros((num_tare,6)) #output of the load cells is always of DIM 6
     for k in range(num_tare):
-        if version == 8
+        if version == 8:
             voltage = pd.read_csv(tare_files[k],sep='\t',comment='R')
-        elif version == 9
+        elif version == 9:
             fid = open(tare_files[k],'rb')
             tmp = np.fromfile(fid,dtype='<f')
             voltage = np.reshape(tmp,(len(tmp)/6,6),'C')
@@ -145,7 +192,8 @@ def aero_processing(src,params):
     data_indx = np.argsort(data_AoA,axis=0)
     data_AoA = data_AoA[data_indx]
     data_files = [data_files[k] for k in data_indx]
-    for k in range(num_data)
+    aero = [] #initialize data container
+    for k in range(num_data):
         #Calculate rotation matrices
         AoAB = (AoA[k] + params.AoAB)*np.pi/180
         AoAM = (AoA[k] + params.AoAB + params.AoAM)*np.pi/180
@@ -155,9 +203,9 @@ def aero_processing(src,params):
         rotation = np.dot(stability_rot,aircraft_body_rot)
 
         #Load data
-        if version == 8
+        if version == 8:
             voltage = pd.read_csv(data_files[k],sep='\t',comment='R')
-        elif version == 9
+        elif version == 9:
             fid = open(data_files[k],'rb')
             tmp = np.fromfile(fid,dtype='<f')
             voltage = np.reshape(tmp,(len(tmp)/6,6),'C')
@@ -176,4 +224,35 @@ def aero_processing(src,params):
         moment = np.dot(rotation,m_indx(correct).T)
         MRP = np.dot(rotation,np.array([params.Xmrp,params.Ymrp,params.Zmrp]).T)
 
-    return 0
+        D = np.transpose(forces[0,])
+        S = np.transpose(forces[1,])
+        L = np.transpose(forces[2,])
+        RMT = np.transpose(moments[0,])
+        PMT = np.transpose(moments[1,])
+        YMT = np.transpose(moments[2,])
+        XP = MRP[0]
+        YP = MRP[1]
+        ZP = MRP[2]
+
+        #Calculate Aerodynamic coefficients
+        RM = RMT+L*YP-S*ZP
+        PM = PMT-L*XP-D*ZP
+        YM = YMT-D*YP-S*XP
+
+        CL = L/Q/params.Area
+        CD = D/Q/params.Area
+        CS = S/Q/params.Area
+
+        CRM = RM/Q/params.Area/params.span
+        CPM = PM/Q/params.Area/params.Chord
+        CYM = YM/Q/params.Area/params.span
+
+        #append data container
+        aero.append(data_struct(CL,CD,CS,CRM,CPM,CYM))
+
+    #save formatted data
+    processing_file = os.path.basename(__file__)
+    processing_date = time.strftime("%d/%m/%Y")
+    Save_TXT(src,params,aero)
+    np.savez(os.path.join(src,'Results.npz'),params,src,aero,tare,processing_date,processing_file)
+    return aero
