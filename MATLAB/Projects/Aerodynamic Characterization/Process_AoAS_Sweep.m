@@ -230,7 +230,7 @@ function Save_TXT(src,params,aero)
     fprintf(fid,'Ref_Area[m2] Ref_Chord_Length[m] Ref_Span_b[m] Xc[m] Yc[m] Zc[m] Balance_AoA_Offset[deg] Model_AoA_Offset[deg] Balance_Side_Slip_Offset[deg] Model_Side_Slip_Slip_Offset[deg] Balance_Roll_Offset[deg] Model_Roll_Offset[deg]\n');
     fprintf(fid,'%s\n',num2str([params.Area,params.Chord,params.span,params.Xmrp,params.Ymrp,params.Zmrp,params.AoAB,params.AoAM,params.AoSB,params.AoSM,params.AoRB,params.AoRM]));
 
-    fprintf(fid,'AoA\tCL\tCD\tCS\tCRM\tCPM\tCYM\tSD(CL)\tSD(CD)\tSD(CS)\tSD(CRM)\tSD(CPM)\tSD(CYM)');
+    fprintf(fid,'AoA CL CD CS CRM CPM CYM SD(CL) SD(CD) SD(CS) SD(CRM) SD(CPM) SD(CYM)');
 
     for n = 1:length(aero)
         fprintf(fid,'\n');  
