@@ -26,7 +26,7 @@ function aero = Process_AoAS_Sweep(src,params)
 %   AoRM            Roll offset of model
 %                   (default=0)
 %%%%%%%%%%%%
-%last edited by mcrawley on 2016-01-22
+%last edited by mcrawley on 2016-02-12
 
     %Set defaults, if they do not exist
     if ~exist('params','var'), params = struct; end
@@ -63,7 +63,7 @@ function aero = Process_AoAS_Sweep(src,params)
     Rot3 = @(angle) [1 0 0 ; 0 cos(angle) sin(angle) ; 0 -sin(angle) cos(angle)];
 
     %%% Get Calibration Data
-    [cal,f_indx,T_indx] = Calibration(params.loadcell);
+    [cal,f_indx,T_indx] = LoadCell_Calibration(params.loadcell);
 
     %%% Find Data and Tare files (and figure out versioning)
     tare_files = getfiles('*.tare',src);
@@ -120,15 +120,7 @@ function aero = Process_AoAS_Sweep(src,params)
         tare(n).AoS = str2double(angles.AoS);
 
         %Read voltages & convert to mean load
-        fid = fopen([tare_dir,filesep,tare_files{n}]);
-        if version == 8
-            tmp = textscan(fid,'%f','headerlines',1);
-            voltage = reshape(tmp{1},6,[]);
-        else
-            tmp = fread(fid,'float32');
-            voltage = reshape(tmp,[],6)';
-        end
-        fclose(fid);
+        voltage = Read_LoadCell([tare_dir,filesep,tare_files{n}],version);
         tare(n).means = mean((cal*voltage)',1);
     end
     %sort by increasing angle of attack
@@ -144,15 +136,7 @@ function aero = Process_AoAS_Sweep(src,params)
         aero(n).AoS = str2double(angles.AoS);
 
         %Read raw voltages & convert to force/torque
-        fid = fopen([src,filesep,data_files{n}]);
-        if version == 8
-            tmp = textscan(fid,'%f','headerlines',1);
-            voltage = reshape(tmp{1},6,[]);
-        else
-            tmp = fread(fid,'float32');
-            voltage = reshape(tmp,[],6)';
-        end
-        fclose(fid);
+        voltage = Read_LoadCell([src,filesep,data_files{n}],version);
         loads = (cal*voltage)';
         raw.mean = mean(loads,1);
         raw.std = std(loads,[],1);
@@ -240,106 +224,4 @@ function Save_TXT(src,params,aero)
 
     fclose(fid);
 
-end
-
-function [cal,f_indx,T_indx] = Calibration(loadcell)
-    switch lower(loadcell)
-        case 'jr3_fz_down'
-            cal = importdata('JR3_CalibrationMatrix.txt');
-            f_indx = @(x) x(:,[3,2,1]).*repmat([-1 1 -1],size(x,1),1);
-            T_indx = @(x) x(:,[6,5,4]).*repmat([-1 1 1],size(x,1),1);
-        case 'jr3_fz_up'
-            cal = importdata('JR3_CalibrationMatrix.txt');
-            f_indx = @(x) x(:,[1,2,3]).*repmat([1 -1 1],size(x,1),1);
-            T_indx = @(x) x(:,[4,5,6]).*repmat([1 -1 1],size(x,1),1);
-        case 'ati_n25_fz_up'
-            cal = importdata('ATI_N25_FT14574.txt');
-            f_indx = @(x) x(:,[1,2,3]);
-            T_indx = @(x) x(:,[4,5,6]);
-        case 'ati_n25_fz_down'
-            cal = importdata('ATI_N25_FT14574.txt');
-            f_indx = @(x) x(:,[1,2,3]).*repmat([1 -1 -1],size(x,1),1);
-            T_indx = @(x) x(:,[4,5,6]).*repmat([1 -1 -1],size(x,1),1);
-        otherwise
-            error('Incorrect load cell definition');
-    end
-end
-
-function [flist,src_dir,folders] = getfiles(condition,varargin)
-%[flist,src_dir,folders] = getfiles(condition,varargin)
-%Function returns list of files and folders (and source directory) based on
-%a given condition.
-%Inputs:
-%           condition:  conditional string on which returned files are
-%                       dependent.  Accepts wildcards.  [] returns all
-%                       files in directory.
-%           options:
-%                       path:   specify top-level directory for searching.
-%                               If this is not specified, the program
-%                               prompts the user.
-%                       '-a' or '-all': searches subdirectories in addition
-%                                       to top-level.
-%                       '-s' or '-sub': allows user to select a subset of
-%                                       the found files.
-
-    if ~exist('condition','var'), condition = ''; end
-    if isempty(varargin), varargin = {''}; end
-
-    %Determine search directory
-    test = cellfun(@(lst) isdir(lst),varargin);
-    if any(test)
-        src_dir = varargin{test};
-    else
-        src_dir = uigetdir('Specify Directory');
-    end
-
-    %find files within directory that match given condition
-    flist = findfiles(src_dir,condition);
-
-    %find folders and contents within
-    cutoff = length(src_dir)+2; %cutoff for folder name
-    if any(strcmpi(varargin,'-all')) || any(strcmpi(varargin,'-a'))
-        tmp = genpath(src_dir);
-        folders = regexp(tmp,pathsep,'split'); %find subdirs
-        folders = folders(2:end); %remove top level directory from subdir list
-        folder_keep = true(1,length(folders)); %logical check for folder contents
-        for n = 1:length(folders)
-           tflist = findfiles(folders{n},condition); %find files in given subdir
-           if ~isempty(tflist)
-               tflist = cellfun(@(file) fullfile(folders{n}(cutoff:end),file),tflist,'UniformOutput',false); %append subdir name to file
-               flist = [flist, tflist]; %append new subdir filelist to dir filelist
-           else
-               folder_keep(n) = false;
-           end
-        end
-        folders = folders(folder_keep);
-    else
-        folders = cell(0);
-    end
-
-    %Lets user choose the subset of files in that directory for gathering
-    if any(strcmpi(varargin,'-sub')) || any(strcmpi(varargin,'-s'))
-        l = max(cellfun(@length,flist));
-        [keep,ok] = listdlg('PromptString','Select Desired Files','SelectionMode','multiple','ListSize',[8*l 300],'ListString',flist);
-        if ok==0
-            error('Function Terminated Due to User Selection of Cancel')
-        end
-        flist = flist(keep);
-    end
-    flist = flist';
-
-    %If user is requesting folders, output file list should be changed
-    if nargout > 2
-        for n = 1:length(folders)
-            group = cellfun(@(x) strcmp(folders{n}(cutoff:end),fileparts(x)),flist);
-            swap{n} = flist(group);
-        end
-        flist = swap;
-    end
-end
-
-function [tflist] = findfiles(src_dir,condition)
-    list = dir([src_dir,filesep,condition]);
-    chk = [list.isdir];
-    tflist = {list(~chk).name};
 end

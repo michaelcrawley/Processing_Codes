@@ -4,8 +4,8 @@ clear;
 %Variables
 M = 2.5;
 A_test = (6*0.0254)^2;
-V = 19; %cubic meters
-p_i = 215*6894.76;
+V = 8000 * 0.00378541; % convert from gallons to cubic meters
+p_i = 190*6894.76;
 
 %Constants
 R = 287;
